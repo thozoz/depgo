@@ -69,7 +69,9 @@ func authorizeDownloadToken(c *gin.Context) bool {
 		c.Abort()
 		return false
 	}
-	return true
+	// Reuse the session check so an evicted or expired device session cannot
+	// keep downloading with a still-valid JWT.
+	return HandleSession(c, user)
 }
 
 func parsePath(path string) string {
