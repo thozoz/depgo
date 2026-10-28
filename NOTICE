@@ -1,0 +1,14 @@
+Depgo
+Copyright (C) 2026 Depgo Contributors
+
+This project is derived from and incorporates source code from AList:
+Upstream Project: AList (https://github.com/alist-org/alist)
+Upstream License: GNU Affero General Public License v3.0 (AGPL-3.0)
+
+Depgo is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+Source code for Depgo is available at:
+https://github.com/thozoz/depgo
+
+In accordance with Section 5 and Section 13 of the GNU AGPL-3.0:
+- This work contains modified versions of AList source code.
+- Prominent notices are kept and source code is made available as required.

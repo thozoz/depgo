@@ -1,0 +1,423 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { User, FileItem } from './types';
+import { authApi, fsApi, setOnAuthFailure } from './api/client';
+import { joinPath } from './utils/format';
+import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
+import { Breadcrumbs } from './components/Breadcrumbs';
+import { FilterInput } from './components/FilterInput';
+import { FileList } from './components/FileList';
+import { FileGrid } from './components/FileGrid';
+import { NewFolderModal } from './components/NewFolderModal';
+import { UploadModal } from './components/UploadModal';
+import { RenameModal } from './components/RenameModal';
+import { MoveModal } from './components/MoveModal';
+import { DeleteDialog } from './components/DeleteDialog';
+import { ShareModal } from './components/ShareModal';
+import { PreviewModal } from './components/PreviewModal';
+import { ShareManagement } from './components/ShareManagement';
+import { TrashManagement } from './components/TrashManagement';
+import { TextEditorModal } from './components/TextEditorModal';
+import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { GuestShareView } from './components/GuestShareView';
+import { LoginView } from './components/LoginView';
+import { RefreshIcon, SpinnerIcon } from './components/Icons';
+
+export const App: React.FC = () => {
+  // Check if current URL is a guest share (/s/:share_id)
+  const [currentUrlPath, setCurrentUrlPath] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentUrlPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const guestShareId = useMemo(() => {
+    if (currentUrlPath.startsWith('/s/')) {
+      const match = currentUrlPath.replace(/^\/s\//, '').split('/')[0];
+      return match || null;
+    }
+    return null;
+  }, [currentUrlPath]);
+
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(authApi.isAuthenticated());
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    setOnAuthFailure(() => {
+      setIsAuthenticated(false);
+      setUser(null);
+    });
+    return () => setOnAuthFailure(null);
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && !guestShareId) {
+      authApi
+        .me()
+        .then(setUser)
+        .catch(() => {
+          setIsAuthenticated(false);
+          setUser(null);
+        });
+    }
+  }, [isAuthenticated, guestShareId]);
+
+  // Main UI state
+  const [activeTab, setActiveTab] = useState<'files' | 'shares' | 'trash'>('files');
+  const [currentDir, setCurrentDir] = useState<string>('/');
+  const [items, setItems] = useState<FileItem[]>([]);
+  const [totalFiles, setTotalFiles] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const perPage = 100;
+
+  const [filterQuery, setFilterQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Modals state
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
+  const [moveTarget, setMoveTarget] = useState<FileItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
+  const [shareTarget, setShareTarget] = useState<FileItem | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<{ item: FileItem; rawUrl: string } | null>(null);
+  const [textEditorTarget, setTextEditorTarget] = useState<{ filePath: string; fileName: string } | null>(null);
+  const [versionHistoryTarget, setVersionHistoryTarget] = useState<{ filePath: string; fileName: string } | null>(null);
+
+  // Fetch file list with explicit pagination
+  const loadFiles = useCallback(
+    async (path = currentDir, targetPage = 1, refresh = false) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const resp = await fsApi.list(path, '', refresh, targetPage, perPage);
+        setItems(resp.content || []);
+        setTotalFiles(resp.total || 0);
+        setHasMore(!!resp.has_more);
+        setPage(targetPage);
+        setCurrentDir(path);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Dosyalar yüklenemedi');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentDir]
+  );
+
+  useEffect(() => {
+    if (isAuthenticated && !guestShareId && activeTab === 'files') {
+      loadFiles(currentDir, 1);
+    }
+  }, [isAuthenticated, guestShareId, activeTab, currentDir, loadFiles]);
+
+  // Filtered files
+  const filteredItems = useMemo(() => {
+    if (!filterQuery.trim()) return items;
+    const lower = filterQuery.toLowerCase();
+    return items.filter((item) => item.name.toLowerCase().includes(lower));
+  }, [items, filterQuery]);
+
+  // Handlers for file operations
+  const handleOpenFolder = (folder: FileItem) => {
+    const nextPath = joinPath(currentDir, folder.name);
+    setFilterQuery('');
+    setPage(1);
+    loadFiles(nextPath, 1);
+  };
+
+  const handleNavigateBreadcrumb = (path: string) => {
+    setFilterQuery('');
+    setPage(1);
+    loadFiles(path, 1);
+  };
+
+  const handlePreview = async (item: FileItem) => {
+    try {
+      const fullPath = joinPath(currentDir, item.name);
+      const fileData = await fsApi.get(fullPath);
+      setPreviewTarget({
+        item,
+        rawUrl: fileData.raw_url,
+      });
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Önizleme bağlantısı alınamadı');
+    }
+  };
+
+  const handleEdit = (item: FileItem) => {
+    const fullPath = joinPath(currentDir, item.name);
+    setTextEditorTarget({
+      filePath: fullPath,
+      fileName: item.name,
+    });
+  };
+
+  const handleVersions = (item: FileItem) => {
+    const fullPath = joinPath(currentDir, item.name);
+    setVersionHistoryTarget({
+      filePath: fullPath,
+      fileName: item.name,
+    });
+  };
+
+  const handleDownload = async (item: FileItem) => {
+    try {
+      const fullPath = joinPath(currentDir, item.name);
+      const fileData = await fsApi.get(fullPath);
+      if (fileData.raw_url) {
+        window.open(fileData.raw_url, '_blank');
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'İndirme bağlantısı alınamadı');
+    }
+  };
+
+  const handleNewFolderSubmit = async (folderName: string) => {
+    const fullPath = joinPath(currentDir, folderName);
+    await fsApi.mkdir(fullPath);
+    await loadFiles(currentDir, page, true);
+  };
+
+  const handleRenameSubmit = async (item: FileItem, newName: string) => {
+    const fullPath = joinPath(currentDir, item.name);
+    await fsApi.rename(fullPath, newName);
+    await loadFiles(currentDir, page, true);
+  };
+
+  const handleMoveSubmit = async (item: FileItem, targetDir: string) => {
+    await fsApi.move(currentDir, targetDir, [item.name]);
+    await loadFiles(currentDir, page, true);
+  };
+
+  const handleDeleteConfirm = async (item: FileItem) => {
+    await fsApi.remove(currentDir, [item.name]);
+    await loadFiles(currentDir, page, true);
+  };
+
+  const handleLogout = async () => {
+    await authApi.logout();
+    setIsAuthenticated(false);
+    setUser(null);
+  };
+
+  const totalPages = Math.ceil(totalFiles / perPage) || 1;
+
+  // If Guest Share route /s/:share_id, render GuestShareView
+  if (guestShareId) {
+    return <GuestShareView shareId={guestShareId} />;
+  }
+
+  // If not authenticated, render LoginView
+  if (!isAuthenticated) {
+    return <LoginView onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
+
+  return (
+    <div className="min-h-screen bg-warm-50 flex flex-col">
+      <Navbar
+        user={user}
+        viewMode={viewMode}
+        onToggleViewMode={() => setViewMode((prev) => (prev === 'list' ? 'grid' : 'list'))}
+        onLogout={handleLogout}
+        onOpenMobileMenu={() => setMobileMenuOpen(true)}
+      />
+
+      <div className="flex-1 flex overflow-hidden">
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={(tab) => {
+            setActiveTab(tab);
+            setFilterQuery('');
+          }}
+          onNewFolder={() => setNewFolderOpen(true)}
+          onUpload={() => setUploadOpen(true)}
+          isOpenMobile={mobileMenuOpen}
+          onCloseMobile={() => setMobileMenuOpen(false)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="max-w-7xl mx-auto space-y-4">
+            {activeTab === 'files' ? (
+              <>
+                {/* Control bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-2.5">
+                  <Breadcrumbs currentPath={currentDir} onNavigate={handleNavigateBreadcrumb} />
+
+                  <div className="flex items-center space-x-2 w-full min-w-0 sm:w-auto">
+                    <FilterInput value={filterQuery} onChange={setFilterQuery} />
+                    <button
+                      type="button"
+                      onClick={() => loadFiles(currentDir, page, true)}
+                      disabled={loading}
+                      className="p-2 text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-lg transition-colors flex-shrink-0"
+                      title="Yenile"
+                    >
+                      <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
+                    {error}
+                  </div>
+                )}
+
+                {loading && items.length === 0 ? (
+                  <div className="py-20 text-center text-charcoal-500">
+                    <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
+                    <span className="text-sm">Dosyalar yükleniyor...</span>
+                  </div>
+                ) : viewMode === 'list' ? (
+                  <FileList
+                    items={filteredItems}
+                    onOpenFolder={handleOpenFolder}
+                    onPreview={handlePreview}
+                    onEdit={handleEdit}
+                    onVersions={handleVersions}
+                    onDownload={handleDownload}
+                    onShare={(item) => setShareTarget(item)}
+                    onRename={(item) => setRenameTarget(item)}
+                    onMove={(item) => setMoveTarget(item)}
+                    onDelete={(item) => setDeleteTarget(item)}
+                  />
+                ) : (
+                  <FileGrid
+                    items={filteredItems}
+                    onOpenFolder={handleOpenFolder}
+                    onPreview={handlePreview}
+                    onEdit={handleEdit}
+                    onVersions={handleVersions}
+                    onDownload={handleDownload}
+                    onShare={(item) => setShareTarget(item)}
+                    onRename={(item) => setRenameTarget(item)}
+                    onMove={(item) => setMoveTarget(item)}
+                    onDelete={(item) => setDeleteTarget(item)}
+                  />
+                )}
+
+                {/* File list pagination bar (prevent silent truncation) */}
+                {(totalFiles > perPage || hasMore) && !filterQuery && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-white border border-charcoal-200 rounded-xl text-xs text-charcoal-600">
+                    <span>
+                      Toplam {totalFiles} öğeden {(page - 1) * perPage + 1} -{' '}
+                      {Math.min(page * perPage, totalFiles)} arası gösteriliyor
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => loadFiles(currentDir, page - 1)}
+                        disabled={page <= 1 || loading}
+                        className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                      >
+                        Önceki Sayfa
+                      </button>
+                      <span className="font-medium text-charcoal-800">
+                        {page} / {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => loadFiles(currentDir, page + 1)}
+                        disabled={(!hasMore && page >= totalPages) || loading}
+                        className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                      >
+                        Sonraki Sayfa
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : activeTab === 'shares' ? (
+              <ShareManagement />
+            ) : (
+              <TrashManagement />
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* Modals */}
+      <NewFolderModal
+        isOpen={newFolderOpen}
+        onClose={() => setNewFolderOpen(false)}
+        onSubmit={handleNewFolderSubmit}
+      />
+
+      <UploadModal
+        isOpen={uploadOpen}
+        currentDir={currentDir}
+        onClose={() => setUploadOpen(false)}
+        onCompleted={() => loadFiles(currentDir, page, true)}
+      />
+
+      <RenameModal
+        isOpen={!!renameTarget}
+        item={renameTarget}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={handleRenameSubmit}
+      />
+
+      <MoveModal
+        isOpen={!!moveTarget}
+        item={moveTarget}
+        currentDir={currentDir}
+        onClose={() => setMoveTarget(null)}
+        onSubmit={handleMoveSubmit}
+      />
+
+      <DeleteDialog
+        isOpen={!!deleteTarget}
+        item={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
+      />
+
+      <ShareModal
+        isOpen={!!shareTarget}
+        item={shareTarget}
+        onClose={() => setShareTarget(null)}
+      />
+
+      {previewTarget && (
+        <PreviewModal
+          isOpen={true}
+          name={previewTarget.item.name}
+          size={previewTarget.item.size}
+          rawUrl={previewTarget.rawUrl}
+          onClose={() => setPreviewTarget(null)}
+          onDownload={() => handleDownload(previewTarget.item)}
+        />
+      )}
+
+      {textEditorTarget && (
+        <TextEditorModal
+          isOpen={true}
+          filePath={textEditorTarget.filePath}
+          fileName={textEditorTarget.fileName}
+          onClose={() => setTextEditorTarget(null)}
+          onSaved={() => loadFiles(currentDir, page, true)}
+        />
+      )}
+
+      {versionHistoryTarget && (
+        <VersionHistoryModal
+          isOpen={true}
+          filePath={versionHistoryTarget.filePath}
+          fileName={versionHistoryTarget.fileName}
+          onClose={() => setVersionHistoryTarget(null)}
+          onRestored={() => loadFiles(currentDir, page, true)}
+        />
+      )}
+    </div>
+  );
+};

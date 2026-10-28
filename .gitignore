@@ -1,1 +1,21 @@
 temp/
+
+# Dependencies and generated frontend assets
+frontend/node_modules/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+backend/public/dist/*
+!backend/public/dist/README.md
+
+# Local runtime state, secrets and build outputs
+backend/data/
+/data/
+/build/
+/backend/alist
+/backend/alist.exe
+/backend/depgo
+/backend/depgo.exe
+.env
+.env.*
+!.env.example
