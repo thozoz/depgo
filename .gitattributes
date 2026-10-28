@@ -18,6 +18,11 @@
 *.xml text eol=lf
 *.txt text eol=lf
 
+# Windows scripts keep CRLF for cmd.exe/PowerShell compatibility
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
 # Treat common binary file types as binary
 *.png binary
 *.jpg binary
@@ -29,8 +34,3 @@
 *.jar binary
 *.exe binary
 *.bin binary
-
-# Ensure any editor backup/temp files are not normalized (keep as binary)
-*.swp binary
-*.swo binary
-*.DS_Store binary

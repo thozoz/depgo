@@ -19,3 +19,8 @@ backend/data/
 .env
 .env.*
 !.env.example
+
+# Editor and OS metadata
+.DS_Store
+*.swp
+*.swo
