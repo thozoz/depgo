@@ -21,6 +21,7 @@ import (
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
 	shareauth "github.com/alist-org/alist/v3/internal/share"
+	pkgSign "github.com/alist-org/alist/v3/pkg/sign"
 	"github.com/alist-org/alist/v3/server"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -498,4 +499,180 @@ func TestBootstrapQuotedRootPath(t *testing.T) {
 	var decoded map[string]string
 	require.NoError(t, json.Unmarshal(encoded, &decoded))
 	assert.Equal(t, quotedPath, decoded["root_folder_path"])
+}
+
+func TestFsListEmitsFiniteSignaturesAndRejectsPerpetual(t *testing.T) {
+	r, _, adminToken, rootDir, _ := setupTestServer(t)
+
+	// Create test file
+	filePath := filepath.Join(rootDir, "download_test.txt")
+	require.NoError(t, os.WriteFile(filePath, []byte("hello finite download"), 0644))
+
+	// Ensure link_expiration setting is "0" (testing zero lifetime config) and SignAll is "true"
+	_ = op.SaveSettingItem(&model.SettingItem{Key: conf.LinkExpiration, Value: "0"})
+	_ = op.SaveSettingItem(&model.SettingItem{Key: conf.SignAll, Value: "true"})
+	op.SettingCacheUpdate()
+
+	// 1. Call /api/fs/list
+	listReqBody := `{"path":"/"}`
+	reqList := httptest.NewRequest("POST", "/api/fs/list", strings.NewReader(listReqBody))
+	reqList.Header.Set("Authorization", adminToken)
+	reqList.Header.Set("Content-Type", "application/json")
+	wList := httptest.NewRecorder()
+	r.ServeHTTP(wList, reqList)
+	require.Equal(t, 200, parseRespCode(t, wList))
+
+	var listResp struct {
+		Code int `json:"code"`
+		Data struct {
+			Content []struct {
+				Name string `json:"name"`
+				Sign string `json:"sign"`
+			} `json:"content"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(wList.Body.Bytes(), &listResp))
+	var sig string
+	for _, item := range listResp.Data.Content {
+		if item.Name == "download_test.txt" {
+			sig = item.Sign
+			break
+		}
+	}
+	require.NotEmpty(t, sig, "file item must have non-empty download signature")
+	assert.False(t, strings.HasSuffix(sig, ":0"), "signature must not end in perpetual :0 marker")
+
+	// 2. Download with valid signature succeeds
+	reqDown := httptest.NewRequest("GET", "/d/download_test.txt?sign="+sig, nil)
+	wDown := httptest.NewRecorder()
+	r.ServeHTTP(wDown, reqDown)
+	assert.Equal(t, 200, wDown.Code)
+	assert.Equal(t, "hello finite download", wDown.Body.String())
+
+	// 3. Download with perpetual signature (ending in :0) must be rejected with 401
+	signer := pkgSign.NewHMACSign([]byte(adminToken))
+	perpetualSig := signer.Sign("/download_test.txt", 0)
+	require.True(t, strings.HasSuffix(perpetualSig, ":0"))
+
+	reqPerp := httptest.NewRequest("GET", "/d/download_test.txt?sign="+perpetualSig, nil)
+	wPerp := httptest.NewRecorder()
+	r.ServeHTTP(wPerp, reqPerp)
+	assert.Equal(t, 401, parseRespCode(t, wPerp))
+}
+
+func TestPublicShareRepeatedRangeAndContentAccessAcrossUpdatedAtChange(t *testing.T) {
+	r, _, adminToken, rootDir, _ := setupTestServer(t)
+
+	// Create test file
+	filePath := filepath.Join(rootDir, "stream_test.txt")
+	fileData := []byte("0123456789abcdefghijklmnopqrstuvwxyz")
+	require.NoError(t, os.WriteFile(filePath, fileData, 0644))
+
+	// Create share with password
+	createBody := `{"path":"/stream_test.txt","name":"stream_share","password":"secretpassword"}`
+	reqCreate := httptest.NewRequest("POST", "/api/share/create", strings.NewReader(createBody))
+	reqCreate.Header.Set("Authorization", adminToken)
+	reqCreate.Header.Set("Content-Type", "application/json")
+	wCreate := httptest.NewRecorder()
+	r.ServeHTTP(wCreate, reqCreate)
+	require.Equal(t, 200, parseRespCode(t, wCreate))
+
+	var createResp struct {
+		Data struct {
+			ShareID string `json:"share_id"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(wCreate.Body.Bytes(), &createResp))
+	shareID := createResp.Data.ShareID
+	require.NotEmpty(t, shareID)
+
+	// Authenticate to get share token
+	authBody := fmt.Sprintf(`{"share_id":"%s","password":"secretpassword"}`, shareID)
+	reqAuth := httptest.NewRequest("POST", "/api/public/share/auth", strings.NewReader(authBody))
+	reqAuth.Header.Set("Content-Type", "application/json")
+	wAuth := httptest.NewRecorder()
+	r.ServeHTTP(wAuth, reqAuth)
+	require.Equal(t, 200, parseRespCode(t, wAuth))
+
+	var authResp struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(wAuth.Body.Bytes(), &authResp))
+	shareToken := authResp.Data.Token
+	require.NotEmpty(t, shareToken)
+
+	// First content request: Range bytes=0-9
+	reqRange1 := httptest.NewRequest("GET", fmt.Sprintf("/sp/%s?auth=%s", shareID, shareToken), nil)
+	reqRange1.Header.Set("Range", "bytes=0-9")
+	wRange1 := httptest.NewRecorder()
+	r.ServeHTTP(wRange1, reqRange1)
+	assert.True(t, wRange1.Code == 200 || wRange1.Code == 206, "expected 200 or 206, got %d", wRange1.Code)
+
+	// Simulate updated_at changing across a second boundary
+	shareRecord, err := db.GetShareByShareID(shareID)
+	require.NoError(t, err)
+	newUpdatedAt := time.Now().Add(5 * time.Second)
+	_ = db.GetDb().Model(&model.Share{}).Where("id = ?", shareRecord.ID).Update("updated_at", newUpdatedAt)
+
+	// Subsequent content request with same token across updated_at change MUST SUCCEED (not 401)
+	reqRange2 := httptest.NewRequest("GET", fmt.Sprintf("/sp/%s?auth=%s", shareID, shareToken), nil)
+	reqRange2.Header.Set("Range", "bytes=10-19")
+	wRange2 := httptest.NewRecorder()
+	r.ServeHTTP(wRange2, reqRange2)
+	assert.True(t, wRange2.Code == 200 || wRange2.Code == 206, "range request across updated_at change must not be rejected with 401, got %d", wRange2.Code)
+
+	// Explicit revocation via AccessRevision increment MUST invalidate the token
+	_ = db.DisableShareByShareID(shareRecord.CreatorID, shareID)
+	reqRevoked := httptest.NewRequest("GET", fmt.Sprintf("/sp/%s?auth=%s", shareID, shareToken), nil)
+	wRevoked := httptest.NewRecorder()
+	r.ServeHTTP(wRevoked, reqRevoked)
+	revokedCode := parseRespCode(t, wRevoked)
+	assert.True(t, revokedCode == 401 || revokedCode == 404, "revoked share must reject access, got code %d", revokedCode)
+
+	// Access limit / burn-after-read semantics preservation test
+	createBurnBody := `{"path":"/stream_test.txt","name":"burn_share","password":"burnpassword","access_limit":1}`
+	reqBurnCreate := httptest.NewRequest("POST", "/api/share/create", strings.NewReader(createBurnBody))
+	reqBurnCreate.Header.Set("Authorization", adminToken)
+	reqBurnCreate.Header.Set("Content-Type", "application/json")
+	wBurnCreate := httptest.NewRecorder()
+	r.ServeHTTP(wBurnCreate, reqBurnCreate)
+	require.Equal(t, 200, parseRespCode(t, wBurnCreate))
+
+	var burnCreateResp struct {
+		Data struct {
+			ShareID string `json:"share_id"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(wBurnCreate.Body.Bytes(), &burnCreateResp))
+	burnShareID := burnCreateResp.Data.ShareID
+
+	// Authenticate for burn share
+	authBurnBody := fmt.Sprintf(`{"share_id":"%s","password":"burnpassword"}`, burnShareID)
+	reqBurnAuth := httptest.NewRequest("POST", "/api/public/share/auth", strings.NewReader(authBurnBody))
+	reqBurnAuth.Header.Set("Content-Type", "application/json")
+	wBurnAuth := httptest.NewRecorder()
+	r.ServeHTTP(wBurnAuth, reqBurnAuth)
+	require.Equal(t, 200, parseRespCode(t, wBurnAuth))
+
+	var burnAuthResp struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(wBurnAuth.Body.Bytes(), &burnAuthResp))
+	burnToken := burnAuthResp.Data.Token
+
+	// First access consumes the single use
+	reqBurn1 := httptest.NewRequest("GET", fmt.Sprintf("/sp/%s?auth=%s", burnShareID, burnToken), nil)
+	wBurn1 := httptest.NewRecorder()
+	r.ServeHTTP(wBurn1, reqBurn1)
+	assert.True(t, wBurn1.Code == 200 || wBurn1.Code == 206)
+
+	// Second access MUST be denied with 410 (consumed), not allowed unlimited
+	reqBurn2 := httptest.NewRequest("GET", fmt.Sprintf("/sp/%s?auth=%s", burnShareID, burnToken), nil)
+	wBurn2 := httptest.NewRecorder()
+	r.ServeHTTP(wBurn2, reqBurn2)
+	assert.Equal(t, 410, parseRespCode(t, wBurn2), "consumed one-use share must return 410")
 }

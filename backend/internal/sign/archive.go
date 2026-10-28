@@ -1,6 +1,7 @@
 package sign
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -13,12 +14,11 @@ var onceArchive sync.Once
 var instanceArchive sign.Sign
 
 func SignArchive(data string) string {
-	expire := setting.GetInt(conf.LinkExpiration, 0)
-	if expire == 0 {
-		return NotExpiredArchive(data)
-	} else {
-		return WithDurationArchive(data, time.Duration(expire)*time.Hour)
+	expire := setting.GetInt(conf.LinkExpiration, DefaultLinkExpirationHours)
+	if expire <= 0 {
+		expire = DefaultLinkExpirationHours
 	}
+	return WithDurationArchive(data, time.Duration(expire)*time.Hour)
 }
 
 func WithDurationArchive(data string, d time.Duration) string {
@@ -31,11 +31,15 @@ func NotExpiredArchive(data string) string {
 	return instanceArchive.Sign(data, 0)
 }
 
-func VerifyArchive(data string, sign string) error {
+func VerifyArchive(data string, s string) error {
+	if strings.HasSuffix(s, ":0") {
+		return sign.ErrSignExpired
+	}
 	onceArchive.Do(InstanceArchive)
-	return instanceArchive.Verify(data, sign)
+	return instanceArchive.Verify(data, s)
 }
 
 func InstanceArchive() {
 	instanceArchive = sign.NewHMACSign([]byte(setting.GetStr(conf.Token) + "-archive"))
 }
+

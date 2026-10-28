@@ -11,11 +11,7 @@ import (
 )
 
 func tokenPayload(share *model.Share) string {
-	updatedAt := int64(0)
-	if !share.UpdatedAt.IsZero() {
-		updatedAt = share.UpdatedAt.Unix()
-	}
-	return fmt.Sprintf("%s:%s:%d:%d", share.ShareID, share.PasswordHash, share.AccessRevision, updatedAt)
+	return fmt.Sprintf("%s:%s:%d", share.ShareID, share.PasswordHash, share.AccessRevision)
 }
 
 func signer() signPkg.Sign {

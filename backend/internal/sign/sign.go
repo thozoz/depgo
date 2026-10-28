@@ -1,6 +1,7 @@
 package sign
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -9,16 +10,17 @@ import (
 	"github.com/alist-org/alist/v3/pkg/sign"
 )
 
+const DefaultLinkExpirationHours = 4
+
 var once sync.Once
 var instance sign.Sign
 
 func Sign(data string) string {
-	expire := setting.GetInt(conf.LinkExpiration, 0)
-	if expire == 0 {
-		return NotExpired(data)
-	} else {
-		return WithDuration(data, time.Duration(expire)*time.Hour)
+	expire := setting.GetInt(conf.LinkExpiration, DefaultLinkExpirationHours)
+	if expire <= 0 {
+		expire = DefaultLinkExpirationHours
 	}
+	return WithDuration(data, time.Duration(expire)*time.Hour)
 }
 
 func WithDuration(data string, d time.Duration) string {
@@ -31,11 +33,15 @@ func NotExpired(data string) string {
 	return instance.Sign(data, 0)
 }
 
-func Verify(data string, sign string) error {
+func Verify(data string, s string) error {
+	if strings.HasSuffix(s, ":0") {
+		return sign.ErrSignExpired
+	}
 	once.Do(Instance)
-	return instance.Verify(data, sign)
+	return instance.Verify(data, s)
 }
 
 func Instance() {
 	instance = sign.NewHMACSign([]byte(setting.GetStr(conf.Token)))
 }
+

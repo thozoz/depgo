@@ -120,7 +120,7 @@ func RecordShareAccess(shareID string) (*model.Share, error) {
 
 		return tx.Model(&model.Share{}).
 			Where("id = ?", updated.ID).
-			Updates(updates).Error
+			UpdateColumns(updates).Error
 	})
 	if err != nil {
 		return nil, err
