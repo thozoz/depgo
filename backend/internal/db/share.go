@@ -41,7 +41,9 @@ func ShareIDExistsExceptID(shareID string, id uint) (bool, error) {
 }
 
 func CreateShare(share *model.Share) error {
-	return db.Create(share).Error
+	// Select all fields: GORM otherwise omits false booleans that carry a
+	// `default:true` tag, silently re-enabling disabled share permissions.
+	return db.Select("*").Create(share).Error
 }
 
 func UpdateShare(share *model.Share) error {

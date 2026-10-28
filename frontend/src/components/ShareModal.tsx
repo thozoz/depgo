@@ -170,8 +170,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           <label htmlFor="share-slug-input" className="block text-xs font-medium text-charcoal-700 mb-1">
             Özel Bağlantı Adı (Slug)
           </label>
-          <div className="flex items-center">
-            <span className="text-xs text-charcoal-400 bg-charcoal-100 border border-r-0 border-charcoal-200 px-2.5 py-2 rounded-l-lg select-none">
+          <div className="flex items-stretch">
+            <span className="flex items-center whitespace-nowrap text-xs text-charcoal-400 bg-charcoal-100 border border-r-0 border-charcoal-200 px-2.5 py-2 rounded-l-lg select-none">
               /s/
             </span>
             <input

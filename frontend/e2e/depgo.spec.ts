@@ -132,8 +132,9 @@ test.describe.serial('Depgo real browser lifecycle', () => {
       { name: 'reader.pdf', mimeType: 'application/pdf', buffer: VISIBLE_PDF_BUFFER },
     ]);
     await dialog.getByRole('button', { name: 'Yüklemeyi Başlat' }).click();
-    await expect(dialog.getByRole('button', { name: 'Kapat', exact: true })).toBeEnabled();
-    await dialog.getByRole('button', { name: 'Kapat', exact: true }).click();
+    const done = dialog.getByText('Kapat', { exact: true });
+    await expect(done).toBeEnabled();
+    await done.click();
     await expect(row(page, 'reader.pdf')).toBeVisible();
     await screenshot(page, 'desktop-files');
 

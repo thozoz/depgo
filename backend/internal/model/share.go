@@ -15,8 +15,8 @@ type Share struct {
 	BurnAfterRead bool       `json:"burn_after_read" gorm:"default:false"`
 	AccessLimit   int64      `json:"access_limit"`
 	AccessCount   int64      `json:"access_count"`
-	AllowPreview  bool       `json:"allow_preview" gorm:"default:true"`
-	AllowDownload bool       `json:"allow_download" gorm:"default:true"`
+	AllowPreview  bool       `json:"allow_preview"`
+	AllowDownload bool       `json:"allow_download"`
 	Enabled       bool       `json:"enabled" gorm:"default:true;index"`
 	AccessRevision int64     `json:"access_revision" gorm:"default:1;not null"`
 	ViewCount     int64      `json:"view_count"`
