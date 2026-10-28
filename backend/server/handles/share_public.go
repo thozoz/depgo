@@ -10,7 +10,19 @@ import (
 	"github.com/alist-org/alist/v3/internal/fs"
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
+
+// bindPublicShareReq keeps struct, field and validator details out of the
+// public response; they stay in the server log.
+func bindPublicShareReq(c *gin.Context, req any) bool {
+	if err := c.ShouldBind(req); err != nil {
+		log.Warnf("public share request rejected: %v", err)
+		common.ErrorStrResp(c, "invalid request", 400)
+		return false
+	}
+	return true
+}
 
 func GetPublicShareInfo(c *gin.Context) {
 	shareID := c.Query("share_id")
@@ -34,28 +46,32 @@ func GetPublicShareInfo(c *gin.Context) {
 	if authed {
 		_ = db.TouchShareView(share.ShareID)
 	}
-	common.SuccessResp(c, PublicShareInfoResp{
-		ShareID:           share.ShareID,
-		Name:              share.Name,
-		IsDir:             share.IsDir,
-		HasPassword:       share.HasPassword(),
-		BurnAfterRead:     share.EffectiveAccessLimit() == 1,
-		AccessLimit:       share.EffectiveAccessLimit(),
-		AccessCount:       share.AccessCount,
-		RemainingAccesses: share.RemainingAccesses(),
-		AllowPreview:      share.AllowPreview,
-		AllowDownload:     share.AllowDownload,
-		Authed:            authed,
-		ConsumedAt:        share.ConsumedAt,
-		ExpiresAt:         share.ExpiresAt,
-		CreatedAt:         share.CreatedAt,
-	})
+	resp := PublicShareInfoResp{
+		ShareID:       share.ShareID,
+		IsDir:         share.IsDir,
+		HasPassword:   share.HasPassword(),
+		BurnAfterRead: share.EffectiveAccessLimit() == 1,
+		AccessLimit:   share.EffectiveAccessLimit(),
+		AllowPreview:  share.AllowPreview,
+		AllowDownload: share.AllowDownload,
+		Authed:        authed,
+		ExpiresAt:     share.ExpiresAt,
+	}
+	// A password-protected share discloses its name and usage metadata only to
+	// callers that already proved knowledge of the password.
+	if authed {
+		resp.Name = share.Name
+		resp.AccessCount = share.AccessCount
+		resp.RemainingAccesses = share.RemainingAccesses()
+		resp.ConsumedAt = share.ConsumedAt
+		resp.CreatedAt = share.CreatedAt
+	}
+	common.SuccessResp(c, resp)
 }
 
 func AuthPublicShare(c *gin.Context) {
 	var req ShareAuthReq
-	if err := c.ShouldBind(&req); err != nil {
-		common.ErrorResp(c, err, 400)
+	if !bindPublicShareReq(c, &req) {
 		return
 	}
 	share, err := db.GetShareByShareID(req.ShareID)
@@ -91,8 +107,7 @@ func AuthPublicShare(c *gin.Context) {
 
 func ListPublicShare(c *gin.Context) {
 	var req PublicShareListReq
-	if err := c.ShouldBind(&req); err != nil {
-		common.ErrorResp(c, err, 400)
+	if !bindPublicShareReq(c, &req) {
 		return
 	}
 	req.Page, req.PerPage = normalizeListPage(req.Page, req.PerPage)
@@ -154,8 +169,7 @@ func ListPublicShare(c *gin.Context) {
 
 func GetPublicShare(c *gin.Context) {
 	var req PublicShareReq
-	if err := c.ShouldBind(&req); err != nil {
-		common.ErrorResp(c, err, 400)
+	if !bindPublicShareReq(c, &req) {
 		return
 	}
 	share, err := db.GetShareByShareID(req.ShareID)

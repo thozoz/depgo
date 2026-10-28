@@ -357,7 +357,10 @@ func ensureShareAccess(c *gin.Context, share *model.Share, token string) bool {
 		return false
 	}
 	if err := shareauth.VerifyAccess(share, token); err != nil {
-		common.ErrorResp(c, err, 401)
+		// Single generic message: the verifier distinguishes missing/invalid
+		// expiry from a bad signature, which would tell a guesser how the token
+		// is built.
+		common.ErrorStrResp(c, "invalid or expired share token", 401)
 		return false
 	}
 	return true

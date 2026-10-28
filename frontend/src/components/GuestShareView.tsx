@@ -101,6 +101,9 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
       setAuthError(null);
       await publicShareApi.auth(shareId, password);
       setAuthRequired(false);
+      // The name is only released once the password is proven, so refresh it.
+      const fresh = await publicShareApi.getInfo(shareId);
+      setInfo(fresh);
       if (info?.is_dir) {
         await loadDirectory(currentPath, 1);
       } else {
