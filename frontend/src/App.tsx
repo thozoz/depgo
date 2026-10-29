@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { User, FileItem } from './types';
 import { authApi, fsApi, setOnAuthFailure } from './api/client';
 import { joinPath } from './utils/format';
@@ -23,6 +23,7 @@ import { GuestShareView } from './components/GuestShareView';
 import { LoginView } from './components/LoginView';
 import { SelectionBar } from './components/SelectionBar';
 import { ContextMenu, ContextMenuPosition } from './components/ContextMenu';
+import { DragPreview } from './components/DragPreview';
 import { RefreshIcon, SpinnerIcon, PlusIcon, UploadIcon, GridIcon, ListIcon } from './components/Icons';
 import { describeError } from './utils/errors';
 import { useTranslation } from './utils/i18n';
@@ -103,6 +104,12 @@ export const App: React.FC = () => {
   // Selection & Context Menu state
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null);
+
+  // Drag and drop state
+  const [draggedItems, setDraggedItems] = useState<FileItem[]>([]);
+  const [dragOverItemName, setDragOverItemName] = useState<string | null>(null);
+  const [dragOverCrumbPath, setDragOverCrumbPath] = useState<string | null>(null);
+  const dragPreviewRef = useRef<HTMLDivElement>(null);
 
   // Fetch file list with explicit pagination
   const loadFiles = useCallback(
@@ -264,6 +271,70 @@ export const App: React.FC = () => {
     });
   };
 
+  // Drag and drop handlers
+  const handleDragStartItem = (item: FileItem, e: React.DragEvent) => {
+    const targets = selectedNames.has(item.name)
+      ? items.filter((i) => selectedNames.has(i.name))
+      : [item];
+    setDraggedItems(targets);
+    e.dataTransfer.setData('text/plain', targets.map((i) => i.name).join(','));
+    e.dataTransfer.effectAllowed = 'move';
+    if (dragPreviewRef.current) {
+      e.dataTransfer.setDragImage(dragPreviewRef.current, 10, 10);
+    }
+  };
+
+  const handleDragOverFolder = (folder: FileItem, e: React.DragEvent) => {
+    if (draggedItems.some((i) => i.name === folder.name)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverItemName(folder.name);
+  };
+
+  const handleDragLeaveFolder = (folder: FileItem) => {
+    if (dragOverItemName === folder.name) {
+      setDragOverItemName(null);
+    }
+  };
+
+  const handleDropToFolder = async (folder: FileItem, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverItemName(null);
+    const targets = draggedItems.filter((i) => i.name !== folder.name);
+    if (targets.length === 0) return;
+    const targetDir = joinPath(currentDir, folder.name);
+    try {
+      setLoading(true);
+      setError(null);
+      await fsApi.move(currentDir, targetDir, targets.map((i) => i.name));
+      await loadFiles(currentDir, page, true);
+      setSelectedNames(new Set());
+    } catch (err: unknown) {
+      setError(describeError(err, t('files.move_error')));
+    } finally {
+      setLoading(false);
+      setDraggedItems([]);
+    }
+  };
+
+  const handleDropToBreadcrumb = async (targetPath: string, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverCrumbPath(null);
+    if (targetPath === currentDir || draggedItems.length === 0) return;
+    try {
+      setLoading(true);
+      setError(null);
+      await fsApi.move(currentDir, targetPath, draggedItems.map((i) => i.name));
+      await loadFiles(currentDir, page, true);
+      setSelectedNames(new Set());
+    } catch (err: unknown) {
+      setError(describeError(err, t('files.move_error')));
+    } finally {
+      setLoading(false);
+      setDraggedItems([]);
+    }
+  };
+
   const handleLogout = async () => {
     await authApi.logout();
     setIsAuthenticated(false);
@@ -310,7 +381,12 @@ export const App: React.FC = () => {
                 {/* Nextcloud Files: Breadcrumbs and Toolbar */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-2.5 shadow-xs">
                   <div className="min-w-0 flex-1">
-                    <Breadcrumbs currentPath={currentDir} onNavigate={handleNavigateBreadcrumb} />
+                    <Breadcrumbs
+                      currentPath={currentDir}
+                      onNavigate={handleNavigateBreadcrumb}
+                      onDropToPath={handleDropToBreadcrumb}
+                      dragOverPath={dragOverCrumbPath}
+                    />
                   </div>
 
                   <div className="flex items-center flex-wrap gap-2 flex-shrink-0">
@@ -398,6 +474,11 @@ export const App: React.FC = () => {
                     onMove={(item) => setMoveTarget(item)}
                     onDelete={(item) => setDeleteTarget(item)}
                     onContextMenu={handleContextMenu}
+                    onDragStartItem={handleDragStartItem}
+                    onDragOverFolder={handleDragOverFolder}
+                    onDragLeaveFolder={handleDragLeaveFolder}
+                    onDropToFolder={handleDropToFolder}
+                    dragOverItemName={dragOverItemName}
                   />
                 ) : (
                   <FileGrid
@@ -414,6 +495,11 @@ export const App: React.FC = () => {
                     onMove={(item) => setMoveTarget(item)}
                     onDelete={(item) => setDeleteTarget(item)}
                     onContextMenu={handleContextMenu}
+                    onDragStartItem={handleDragStartItem}
+                    onDragOverFolder={handleDragOverFolder}
+                    onDragLeaveFolder={handleDragLeaveFolder}
+                    onDropToFolder={handleDropToFolder}
+                    dragOverItemName={dragOverItemName}
                   />
                 )}
 
@@ -512,6 +598,12 @@ export const App: React.FC = () => {
         onRename={(item) => setRenameTarget(item)}
         onMove={(item) => setMoveTarget(item)}
         onDelete={(item) => setDeleteTarget(item)}
+      />
+
+      <DragPreview
+        ref={dragPreviewRef}
+        names={draggedItems.map((i) => i.name)}
+        isFolder={draggedItems.length === 1 && draggedItems[0].is_dir}
       />
 
       <ShareModal

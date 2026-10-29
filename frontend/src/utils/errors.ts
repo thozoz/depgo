@@ -14,6 +14,7 @@ export function describeError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
     const key = BY_MESSAGE[err.message];
     if (key) return t(key);
+    if (err.code === 409) return t('files.move_conflict');
     if (err.code === 429) return t('error.too_many_attempts');
     return err.message;
   }

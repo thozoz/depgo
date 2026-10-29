@@ -3,9 +3,9 @@ import { FileItem } from '../types';
 
 describe('multi-selection logic', () => {
   const sampleItems: FileItem[] = [
-    { name: 'file1.txt', size: 100, is_dir: false, modified: '2026-01-01T00:00:00Z', sign: '', thumb: '', type: 1 },
-    { name: 'file2.txt', size: 200, is_dir: false, modified: '2026-01-01T00:00:00Z', sign: '', thumb: '', type: 1 },
-    { name: 'folder1', size: 0, is_dir: true, modified: '2026-01-01T00:00:00Z', sign: '', thumb: '', type: 0 },
+    { id: '1', path: '/file1.txt', name: 'file1.txt', size: 100, is_dir: false, modified: '2026-01-01T00:00:00Z', sign: '', thumb: '', type: 1 },
+    { id: '2', path: '/file2.txt', name: 'file2.txt', size: 200, is_dir: false, modified: '2026-01-01T00:00:00Z', sign: '', thumb: '', type: 1 },
+    { id: '3', path: '/folder1', name: 'folder1', size: 0, is_dir: true, modified: '2026-01-01T00:00:00Z', sign: '', thumb: '', type: 0 },
   ];
 
   it('toggles selection of single item', () => {
