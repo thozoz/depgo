@@ -1,3 +1,8 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Depgo contributors, inspired by Nextcloud Files Public Share
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 import React, { useState, useEffect } from 'react';
 import { PublicShareInfoResp, PublicShareObjResp } from '../types';
 import { publicShareApi } from '../api/client';
@@ -102,7 +107,6 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
       setAuthError(null);
       await publicShareApi.auth(shareId, password);
       setAuthRequired(false);
-      // The name is only released once the password is proven, so refresh it.
       const fresh = await publicShareApi.getInfo(shareId);
       setInfo(fresh);
       if (info?.is_dir) {
@@ -163,7 +167,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Parola"
               autoFocus
-              className="w-full px-3.5 py-2.5 border border-charcoal-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+              className="w-full px-3.5 py-2.5 border border-charcoal-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
               disabled={authLoading}
             />
 
@@ -176,7 +180,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
             <button
               type="submit"
               disabled={authLoading || !password}
-              className="w-full py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-xl shadow-sm transition-colors disabled:opacity-50"
+              className="w-full py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-semibold rounded-xl shadow-xs transition-colors disabled:opacity-50"
             >
               {authLoading ? 'Doğrulanıyor...' : 'Erişimi Aç'}
             </button>
@@ -213,7 +217,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
   return (
     <div className="min-h-screen bg-warm-50 flex flex-col">
       {/* Header */}
-      <header className="h-14 bg-white border-b border-charcoal-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-10">
+      <header className="h-14 bg-white border-b border-charcoal-200 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-10 shadow-xs">
         <div className="flex items-center space-x-2.5">
           <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center font-bold text-base">
             D
@@ -230,14 +234,14 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
       {/* Main Container */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-4">
         {info?.burn_after_read && (
-          <div role="note" className="px-4 py-2.5 rounded-xl bg-yellow-50 border border-yellow-200 text-xs text-yellow-800">
+          <div role="note" className="px-4 py-2.5 rounded-xl bg-yellow-50 border border-yellow-200 text-xs text-yellow-800 font-medium">
             Bu bağlantı tek okumalık: dosyayı önizlediğinizde veya indirdiğinizde paylaşım silinir ve bir daha açılamaz.
           </div>
         )}
 
         {/* Breadcrumbs (for folder share) */}
         {info?.is_dir && (
-          <nav className="flex items-center space-x-1 text-sm bg-white border border-charcoal-200 rounded-xl px-4 py-2 overflow-x-auto">
+          <nav className="flex items-center space-x-1 text-sm bg-white border border-charcoal-200 rounded-xl px-4 py-2 overflow-x-auto shadow-xs">
             {breadcrumbs.map((crumb, idx) => {
               const isLast = idx === breadcrumbs.length - 1;
               return (
@@ -247,9 +251,9 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
                     type="button"
                     onClick={() => loadDirectory(crumb.path, 1)}
                     disabled={isLast}
-                    className={`flex items-center space-x-1.5 px-2 py-1 rounded text-sm transition-colors flex-shrink-0 ${
+                    className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-sm transition-colors flex-shrink-0 ${
                       isLast
-                        ? 'font-medium text-charcoal-900 cursor-default bg-charcoal-100/50'
+                        ? 'font-semibold text-charcoal-900 cursor-default bg-charcoal-100/60'
                         : 'text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100'
                     }`}
                   >
@@ -262,132 +266,129 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
           </nav>
         )}
 
-        {/* Content table */}
-        {loading && items.length === 0 ? (
-          <div className="py-20 text-center text-charcoal-500">
-            <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
-            <span className="text-sm">İçerik yükleniyor...</span>
-          </div>
-        ) : items.length === 0 ? (
-          <div className="py-16 text-center text-charcoal-400 bg-white border border-charcoal-200 rounded-xl">
-            <FolderIcon className="w-12 h-12 mx-auto mb-2 text-charcoal-300 stroke-1" />
-            <p className="text-sm">Bu klasörde görüntülenecek öğe bulunamadı.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="overflow-x-auto bg-white border border-charcoal-200 rounded-xl shadow-sm">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-warm-100 border-b border-charcoal-200 text-xs font-medium text-charcoal-600 uppercase tracking-wider select-none">
-                  <tr>
-                    <th className="py-3 px-4">Ad</th>
-                    <th className="py-3 px-4 w-28 hidden sm:table-cell">Boyut</th>
-                    <th className="py-3 px-4 w-44 hidden md:table-cell">Tarih</th>
-                    <th className="py-3 px-4 w-32 text-right">İşlem</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-charcoal-100">
-                  {items.map((item) => {
-                    const previewEligible = !item.is_dir && getPreviewEligibility(item.name, item.size).canPreview;
-
-                    return (
-                      <tr key={item.name} className="hover:bg-warm-50/70 transition-colors">
-                        <td className="py-2.5 px-4">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (item.is_dir) {
-                                handleOpenFolder(item);
-                              } else if (previewEligible && item.preview_url) {
-                                setPreviewItem(item);
-                              } else {
-                                handleDownload(item);
-                              }
-                            }}
-                            className="flex items-center space-x-2.5 text-left text-charcoal-800 hover:text-accent font-medium truncate max-w-xs sm:max-w-md"
-                            title={item.name}
-                          >
-                            {renderItemIcon(item)}
-                            <span className="truncate">{item.name}</span>
-                          </button>
-                        </td>
-                        <td className="py-2.5 px-4 text-xs text-charcoal-500 hidden sm:table-cell">
-                          {item.is_dir ? '-' : formatBytes(item.size)}
-                        </td>
-                        <td className="py-2.5 px-4 text-xs text-charcoal-500 hidden md:table-cell">
-                          {formatDate(item.modified)}
-                        </td>
-                        <td className="py-2.5 px-4 text-right">
-                          <div className="flex items-center justify-end space-x-1.5">
-                            {previewEligible && item.preview_url && (
-                              <button
-                                type="button"
-                                onClick={() => setPreviewItem(item)}
-                                className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded"
-                                title="Önizle"
-                              >
-                                <EyeIcon className="w-4 h-4" />
-                              </button>
-                            )}
-                            {!item.is_dir && item.download_url && (
-                              <button
-                                type="button"
-                                onClick={() => handleDownload(item)}
-                                className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded"
-                                title="İndir"
-                              >
-                                <DownloadIcon className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        {/* Items List */}
+        <div className="bg-white border border-charcoal-200 rounded-xl overflow-hidden shadow-xs">
+          {loading && items.length === 0 ? (
+            <div className="py-20 text-center text-charcoal-500">
+              <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
+              <span className="text-sm">İçerik yükleniyor...</span>
             </div>
+          ) : items.length === 0 ? (
+            <div className="py-16 text-center text-charcoal-400">
+              <FolderIcon className="w-12 h-12 mx-auto mb-2 text-charcoal-300 stroke-1" />
+              <p className="text-sm font-medium">Bu klasörde görüntülenecek öğe bulunamadı.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-sm border-collapse">
+              <thead className="bg-warm-50/80 border-b border-charcoal-200 text-xs font-semibold text-charcoal-600 uppercase tracking-wider select-none">
+                <tr>
+                  <th className="py-3 px-4">Ad</th>
+                  <th className="py-3 px-4 w-28 hidden sm:table-cell">Boyut</th>
+                  <th className="py-3 px-4 w-44 hidden md:table-cell">Değiştirilme</th>
+                  <th className="py-3 px-4 w-28 text-right">İşlemler</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-charcoal-100">
+                {items.map((item) => {
+                  const previewEligible = !item.is_dir && getPreviewEligibility(item.name, item.size).canPreview;
 
-            {/* Pagination for public share */}
-            {(totalItems > perPage || hasMore) && (
-              <div className="flex items-center justify-between px-3 py-2 bg-white border border-charcoal-200 rounded-xl text-xs text-charcoal-600">
-                <span>
-                  Toplam {totalItems} öğeden {(page - 1) * perPage + 1} -{' '}
-                  {Math.min(page * perPage, totalItems)} arası gösteriliyor
-                </span>
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={() => loadDirectory(currentPath, page - 1)}
-                    disabled={page <= 1 || loading}
-                    className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
-                  >
-                    Önceki
-                  </button>
-                  <span className="font-medium text-charcoal-800">
-                    {page} / {totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => loadDirectory(currentPath, page + 1)}
-                    disabled={(!hasMore && page >= totalPages) || loading}
-                    className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
-                  >
-                    Sonraki
-                  </button>
-                </div>
-              </div>
-            )}
+                  return (
+                    <tr key={item.name} className="hover:bg-warm-50/70 transition-colors group">
+                      <td className="py-2.5 px-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (item.is_dir) {
+                              handleOpenFolder(item);
+                            } else if (previewEligible) {
+                              setPreviewItem(item);
+                            } else {
+                              handleDownload(item);
+                            }
+                          }}
+                          className="flex items-center space-x-2.5 text-left text-charcoal-900 hover:text-accent font-medium truncate max-w-sm sm:max-w-md"
+                          title={item.name}
+                        >
+                          {renderItemIcon(item)}
+                          <span className="truncate">{item.name}</span>
+                        </button>
+                      </td>
+                      <td className="py-2.5 px-4 text-xs text-charcoal-500 hidden sm:table-cell">
+                        {item.is_dir ? '—' : formatBytes(item.size)}
+                      </td>
+                      <td className="py-2.5 px-4 text-xs text-charcoal-500 hidden md:table-cell">
+                        {formatDate(item.modified)}
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        <div className="flex items-center justify-end space-x-1.5">
+                          {previewEligible && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewItem(item)}
+                              className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-md transition-colors"
+                              title="Önizle"
+                            >
+                              <EyeIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                          {!item.is_dir && item.download_url && (
+                            <button
+                              type="button"
+                              onClick={() => handleDownload(item)}
+                              className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-md transition-colors"
+                              title="İndir"
+                            >
+                              <DownloadIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Guest pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-2 py-1 text-xs text-charcoal-600">
+            <span>
+              Toplam {totalItems} öğeden {(page - 1) * perPage + 1} - {Math.min(page * perPage, totalItems)} arası gösteriliyor
+            </span>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => loadDirectory(currentPath, page - 1)}
+                disabled={page <= 1 || loading}
+                className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
+              >
+                Önceki
+              </button>
+              <span className="font-semibold text-charcoal-800">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => loadDirectory(currentPath, page + 1)}
+                disabled={(!hasMore && page >= totalPages) || loading}
+                className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
+              >
+                Sonraki
+              </button>
+            </div>
           </div>
         )}
       </main>
 
-      {/* Preview modal for guest (safely validated) */}
+      {/* Guest Preview Modal */}
       {previewItem && (
         <PreviewModal
           isOpen={true}
           name={previewItem.name}
           size={previewItem.size}
-          publicPreviewUrl={previewItem.preview_url}
+          publicPreviewUrl={previewItem.preview_url || previewItem.download_url}
           onClose={() => setPreviewItem(null)}
           onDownload={() => handleDownload(previewItem)}
         />

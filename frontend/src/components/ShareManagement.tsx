@@ -1,3 +1,8 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Depgo contributors, inspired by Nextcloud Files Sharing
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 import React, { useState, useEffect } from 'react';
 import { ShareResp } from '../types';
 import { shareApi } from '../api/client';
@@ -17,8 +22,10 @@ import {
 } from './Icons';
 import { ShareModal } from './ShareModal';
 import { describeShareError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 export const ShareManagement: React.FC = () => {
+  const { t } = useTranslation();
   const [shares, setShares] = useState<ShareResp[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -68,7 +75,6 @@ export const ShareManagement: React.FC = () => {
   };
 
   const handleEnable = async (share: ShareResp) => {
-    // A link that ran out of reads starts a fresh budget when it is enabled again.
     const spent = share.access_limit > 0 && share.remaining_accesses === 0;
     if (spent && !window.confirm('Bu bağlantının erişim hakkı dolmuştu. Yeniden etkinleştirince hak sıfırlanır ve bağlantı tekrar okunabilir. Devam edilsin mi?')) {
       return;
@@ -98,9 +104,9 @@ export const ShareManagement: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-3 shadow-xs">
         <div>
-          <h2 className="text-lg font-semibold text-charcoal-900">Paylaşım Bağlantıları</h2>
+          <h2 className="text-base font-semibold text-charcoal-900">Paylaşım Bağlantıları</h2>
           <p className="text-xs text-charcoal-500">
             Dış kullanıcılar için oluşturulan dosya ve klasör bağlantılarını yönetin.
           </p>
@@ -109,11 +115,11 @@ export const ShareManagement: React.FC = () => {
           type="button"
           onClick={() => fetchShares(page)}
           disabled={loading}
-          className="flex items-center space-x-1 px-3 py-1.5 bg-white border border-charcoal-200 hover:bg-warm-100 rounded-lg text-xs font-medium text-charcoal-700 transition-colors"
+          className="flex items-center space-x-1.5 px-3 py-1.5 bg-warm-50 hover:bg-warm-100 border border-charcoal-200 rounded-lg text-xs font-semibold text-charcoal-700 transition-colors self-start sm:self-auto"
           title="Listeyi Yenile"
         >
           <RefreshIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Yenile</span>
+          <span>{t('common.refresh')}</span>
         </button>
       </div>
 
@@ -124,23 +130,23 @@ export const ShareManagement: React.FC = () => {
       )}
 
       {loading && shares.length === 0 ? (
-        <div className="py-16 text-center text-charcoal-500">
+        <div className="py-20 text-center text-charcoal-500 bg-white border border-charcoal-200 rounded-xl">
           <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
           <span className="text-sm">Paylaşımlar yükleniyor...</span>
         </div>
       ) : shares.length === 0 ? (
-        <div className="py-16 text-center text-charcoal-400 bg-white border border-charcoal-200 rounded-xl">
+        <div className="py-20 text-center text-charcoal-400 bg-white border border-charcoal-200 rounded-xl">
           <ShareIcon className="w-12 h-12 mx-auto mb-2 text-charcoal-300 stroke-1" />
-          <p className="text-sm font-medium text-charcoal-600">Henüz aktif bir paylaşım bağlantısı yok</p>
-          <p className="text-xs text-charcoal-400 mt-1">
+          <p className="text-sm font-semibold text-charcoal-700">Henüz aktif bir paylaşım bağlantısı yok</p>
+          <p className="text-xs text-charcoal-500 mt-1">
             Dosyalar sekmesinden bir dosya veya klasör seçip "Paylaş" butonuna tıklayarak bağlantı oluşturabilirsiniz.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="overflow-x-auto bg-white border border-charcoal-200 rounded-xl">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-warm-100 border-b border-charcoal-200 text-xs font-medium text-charcoal-600 uppercase tracking-wider select-none">
+          <div className="overflow-x-auto bg-white border border-charcoal-200 rounded-xl shadow-xs">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead className="bg-warm-50/80 border-b border-charcoal-200 text-xs font-semibold text-charcoal-600 uppercase tracking-wider select-none">
                 <tr>
                   <th className="py-3 px-4">Bağlantı & Ad</th>
                   <th className="py-3 px-4 hidden md:table-cell">Kök Yol</th>
@@ -169,7 +175,7 @@ export const ShareManagement: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleCopy(share.share_id)}
-                            className="p-1 text-charcoal-400 hover:text-charcoal-700 rounded"
+                            className="p-1 text-charcoal-400 hover:text-charcoal-700 rounded-md transition-colors"
                             title="Bağlantıyı Kopyala"
                           >
                             {copiedId === share.share_id ? (
@@ -186,7 +192,7 @@ export const ShareManagement: React.FC = () => {
                     </td>
                     <td className="py-3 px-4 text-xs text-charcoal-600 hidden sm:table-cell">
                       {share.has_password ? (
-                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-200">
                           <LockIcon className="w-3 h-3" />
                           <span>Parolalı</span>
                         </span>
@@ -202,7 +208,7 @@ export const ShareManagement: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-block whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-block whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           share.enabled
                             ? 'bg-accent/15 text-accent-dark'
                             : 'bg-charcoal-100 text-charcoal-500'
@@ -220,12 +226,12 @@ export const ShareManagement: React.FC = () => {
                       )}
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end space-x-1">
+                      <div className="flex items-center justify-end space-x-1.5">
                         <button
                           type="button"
                           onClick={() => setEditingShare(share)}
-                          className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded"
-                          title="Düzenle"
+                          className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-md transition-colors"
+                          title={t('common.edit')}
                         >
                           <EditIcon className="w-4 h-4" />
                         </button>
@@ -233,7 +239,7 @@ export const ShareManagement: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleDisable(share)}
-                            className="text-xs px-2 py-1 rounded border border-charcoal-200 text-charcoal-600 hover:bg-charcoal-100 transition-colors"
+                            className="text-xs px-2.5 py-1 rounded-md border border-charcoal-200 text-charcoal-600 hover:bg-charcoal-100 font-medium transition-colors"
                             title="Bağlantıyı Devre Dışı Bırak"
                           >
                             Kapat
@@ -242,7 +248,7 @@ export const ShareManagement: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleEnable(share)}
-                            className="text-xs px-2 py-1 rounded border border-accent/40 text-accent-dark hover:bg-accent/10 transition-colors"
+                            className="text-xs px-2.5 py-1 rounded-md border border-accent/40 text-accent font-semibold hover:bg-accent/10 transition-colors"
                             title="Bağlantıyı Yeniden Etkinleştir"
                           >
                             Etkinleştir
@@ -251,8 +257,8 @@ export const ShareManagement: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleDelete(share.share_id)}
-                          className="p-1.5 text-charcoal-500 hover:text-red-600 hover:bg-red-50 rounded"
-                          title="Sil"
+                          className="p-1.5 text-charcoal-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title={t('common.delete')}
                         >
                           <TrashIcon className="w-4 h-4" />
                         </button>
@@ -275,18 +281,18 @@ export const ShareManagement: React.FC = () => {
                   type="button"
                   onClick={() => fetchShares(page - 1)}
                   disabled={page <= 1 || loading}
-                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
                   Önceki
                 </button>
-                <span className="font-medium text-charcoal-800">
+                <span className="font-semibold text-charcoal-800">
                   {page} / {totalPages}
                 </span>
                 <button
                   type="button"
                   onClick={() => fetchShares(page + 1)}
                   disabled={page >= totalPages || loading}
-                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
                   Sonraki
                 </button>

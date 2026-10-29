@@ -1,3 +1,8 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Depgo contributors, inspired by Nextcloud Files Trashbin
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { TrashItem } from '../types';
 import { trashApi, ApiError } from '../api/client';
@@ -13,8 +18,10 @@ import {
   AlertTriangleIcon,
 } from './Icons';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 export const TrashManagement: React.FC = () => {
+  const { t } = useTranslation();
   const [items, setItems] = useState<TrashItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -63,7 +70,6 @@ export const TrashManagement: React.FC = () => {
       await fetchTrash(page);
     } catch (err: unknown) {
       if (err instanceof ApiError && (err.status === 409 || err.code === 409 || err.message.toLowerCase().includes('exist'))) {
-        // 409 collision: original path occupied! Open target_path prompt
         setCollisionItem(item);
         setCustomTargetPath(item.original_path + '.restored');
         setCollisionError('Orijinal konumda aynı isimde bir dosya veya klasör mevcut. Lütfen alternatif bir geri yükleme yolu girin.');
@@ -95,9 +101,9 @@ export const TrashManagement: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Header bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-3 shadow-xs">
         <div>
-          <h2 className="text-lg font-semibold text-charcoal-900">Çöp Kutusu</h2>
+          <h2 className="text-base font-semibold text-charcoal-900">Çöp Kutusu</h2>
           <p className="text-xs text-charcoal-500">
             Silinmiş yerel dosya ve klasörleri görüntüleyin, geri yükleyin veya kalıcı olarak temizleyin.
           </p>
@@ -106,7 +112,7 @@ export const TrashManagement: React.FC = () => {
           type="button"
           onClick={() => fetchTrash(page)}
           disabled={loading}
-          className="flex items-center space-x-1 px-3 py-1.5 bg-white border border-charcoal-200 hover:bg-warm-100 rounded-lg text-xs font-medium text-charcoal-700 transition-colors"
+          className="flex items-center space-x-1.5 px-3 py-1.5 bg-warm-50 hover:bg-warm-100 border border-charcoal-200 rounded-lg text-xs font-semibold text-charcoal-700 transition-colors self-start sm:self-auto"
           title="Yenile"
         >
           <RefreshIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -121,26 +127,26 @@ export const TrashManagement: React.FC = () => {
       )}
 
       {loading && items.length === 0 ? (
-        <div className="py-20 text-center text-charcoal-500 space-y-2">
-          <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto" />
+        <div className="py-20 text-center text-charcoal-500 bg-white border border-charcoal-200 rounded-xl">
+          <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
           <span className="text-sm">Çöp kutusu yükleniyor...</span>
         </div>
       ) : items.length === 0 ? (
-        <div className="py-16 text-center text-charcoal-400 bg-white border border-charcoal-200 rounded-xl">
+        <div className="py-20 text-center text-charcoal-400 bg-white border border-charcoal-200 rounded-xl">
           <TrashIcon className="w-12 h-12 mx-auto mb-2 text-charcoal-300 stroke-1" />
-          <p className="text-sm font-medium text-charcoal-600">Çöp kutusu boş</p>
-          <p className="text-xs text-charcoal-400 mt-1">Silinen öğeler burada saklanır.</p>
+          <p className="text-sm font-semibold text-charcoal-700">Çöp kutusu boş</p>
+          <p className="text-xs text-charcoal-500 mt-1">Silinen öğeler burada saklanır.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="overflow-x-auto bg-white border border-charcoal-200 rounded-xl shadow-sm">
-            <table className="w-full table-fixed sm:table-auto text-left text-sm">
-              <thead className="bg-warm-100 border-b border-charcoal-200 text-xs font-medium text-charcoal-600 uppercase tracking-wider select-none">
+          <div className="overflow-x-auto bg-white border border-charcoal-200 rounded-xl shadow-xs">
+            <table className="w-full table-fixed sm:table-auto text-left text-sm border-collapse">
+              <thead className="bg-warm-50/80 border-b border-charcoal-200 text-xs font-semibold text-charcoal-600 uppercase tracking-wider select-none">
                 <tr>
                   <th className="py-3 px-4">Orijinal Yol & Ad</th>
                   <th className="py-3 px-4 w-28 hidden sm:table-cell">Boyut</th>
                   <th className="py-3 px-4 w-44 hidden md:table-cell">Silinme Tarihi</th>
-                  <th className="py-3 px-1 sm:px-4 w-20 sm:w-52 text-right">
+                  <th className="py-3 px-2 sm:px-4 w-24 sm:w-56 text-right">
                     <span className="sr-only sm:not-sr-only">İşlemler</span>
                   </th>
                 </tr>
@@ -155,7 +161,7 @@ export const TrashManagement: React.FC = () => {
                         ) : (
                           <FileIcon className="w-5 h-5 text-charcoal-400 flex-shrink-0" />
                         )}
-                        <span className="font-mono text-xs text-charcoal-800 truncate" title={item.original_path}>
+                        <span className="font-mono text-xs text-charcoal-900 truncate" title={item.original_path}>
                           {item.original_path}
                         </span>
                       </div>
@@ -166,13 +172,13 @@ export const TrashManagement: React.FC = () => {
                     <td className="py-3 px-4 text-xs text-charcoal-500 hidden md:table-cell">
                       {formatDate(item.deleted_at)}
                     </td>
-                    <td className="py-3 px-1 sm:px-4 text-right">
-                      <div className="flex items-center justify-end space-x-1 sm:space-x-2">
+                    <td className="py-3 px-2 sm:px-4 text-right">
+                      <div className="flex items-center justify-end space-x-1.5">
                         <button
                           type="button"
                           onClick={() => handleRestore(item)}
                           disabled={actionLoadingId === item.trash_id}
-                          className="flex items-center space-x-1 px-2 sm:px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/10 border border-accent/30 rounded-lg transition-colors disabled:opacity-40"
+                          className="flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 border border-accent/30 rounded-lg transition-colors disabled:opacity-40"
                           title="Geri Yükle"
                         >
                           <RestoreIcon className="w-3.5 h-3.5" />
@@ -182,11 +188,11 @@ export const TrashManagement: React.FC = () => {
                           type="button"
                           onClick={() => setDeleteConfirmItem(item)}
                           disabled={actionLoadingId === item.trash_id}
-                          className="flex items-center space-x-1 px-2 sm:px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors disabled:opacity-40"
+                          className="flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors disabled:opacity-40"
                           title="Kalıcı Olarak Sil"
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Kalıcı Sil</span>
+                          <span className="hidden sm:inline">Kalıcı Olarak Sil</span>
                         </button>
                       </div>
                     </td>
@@ -198,28 +204,27 @@ export const TrashManagement: React.FC = () => {
 
           {/* Pagination */}
           {total > perPage && (
-            <div className="flex items-center justify-between px-3 py-2 bg-white border border-charcoal-200 rounded-xl text-xs text-charcoal-600">
+            <div className="flex items-center justify-between px-2 py-1 text-xs text-charcoal-600">
               <span>
-                Toplam {total} silinmiş öğeden {(page - 1) * perPage + 1} -{' '}
-                {Math.min(page * perPage, total)} arası gösteriliyor
+                Toplam {total} öğeden {(page - 1) * perPage + 1} - {Math.min(page * perPage, total)} arası gösteriliyor
               </span>
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
                   onClick={() => fetchTrash(page - 1)}
                   disabled={page <= 1 || loading}
-                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
                   Önceki
                 </button>
-                <span className="font-medium text-charcoal-800">
+                <span className="font-semibold text-charcoal-800">
                   {page} / {totalPages}
                 </span>
                 <button
                   type="button"
                   onClick={() => fetchTrash(page + 1)}
                   disabled={page >= totalPages || loading}
-                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                  className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
                   Sonraki
                 </button>
@@ -229,46 +234,60 @@ export const TrashManagement: React.FC = () => {
         </div>
       )}
 
-      {/* 409 Collision Target Path Modal */}
+      {/* Collision Modal */}
       {collisionItem && (
         <Modal
           isOpen={true}
-          onClose={() => setCollisionItem(null)}
+          onClose={() => {
+            setCollisionItem(null);
+            setCustomTargetPath('');
+            setCollisionError(null);
+          }}
           title="Geri Yükleme Çakışması"
           icon={<AlertTriangleIcon className="w-5 h-5 text-yellow-600" />}
         >
           <div className="space-y-4">
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-xs text-yellow-900">
-              {collisionError}
-            </div>
+            <p className="text-sm text-charcoal-600">
+              Orijinal konumda (<span className="font-mono text-xs font-semibold text-charcoal-900">{collisionItem.original_path}</span>) aynı isimde bir öğe zaten mevcut.
+            </p>
 
             <div>
-              <label htmlFor="target-restore-path" className="block text-xs font-medium text-charcoal-700 mb-1">
+              <label htmlFor="custom-target-path" className="block text-xs font-semibold text-charcoal-700 mb-1">
                 Alternatif Geri Yükleme Yolu
               </label>
               <input
-                id="target-restore-path"
+                id="custom-target-path"
                 type="text"
                 value={customTargetPath}
                 onChange={(e) => setCustomTargetPath(e.target.value)}
-                placeholder="/restored/dosya.txt"
-                className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+                placeholder="/yeni/konum/dosya.ext"
+                className="w-full px-3 py-2 text-sm border border-charcoal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
               />
             </div>
+
+            {collisionError && (
+              <div className="p-2.5 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded-lg">
+                {collisionError}
+              </div>
+            )}
 
             <div className="flex justify-end space-x-2 pt-2">
               <button
                 type="button"
-                onClick={() => setCollisionItem(null)}
-                className="px-3.5 py-1.5 text-xs font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg"
+                onClick={() => {
+                  setCollisionItem(null);
+                  setCustomTargetPath('');
+                  setCollisionError(null);
+                }}
+                className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
               >
-                İptal
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={() => handleRestore(collisionItem, customTargetPath)}
-                disabled={!customTargetPath.trim() || actionLoadingId !== null}
-                className="px-4 py-1.5 text-xs font-medium bg-accent hover:bg-accent-hover text-white rounded-lg shadow-sm disabled:opacity-50"
+                disabled={!customTargetPath.trim() || actionLoadingId === collisionItem.trash_id}
+                className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
               >
                 Bu Konuma Geri Yükle
               </button>
@@ -277,7 +296,7 @@ export const TrashManagement: React.FC = () => {
         </Modal>
       )}
 
-      {/* Permanent Delete Confirmation Dialog */}
+      {/* Permanent Delete Modal */}
       {deleteConfirmItem && (
         <Modal
           isOpen={true}
@@ -287,26 +306,25 @@ export const TrashManagement: React.FC = () => {
           maxWidthClass="max-w-sm"
         >
           <div className="space-y-4">
-            <p className="text-xs text-charcoal-600 break-all">
-              <span className="font-semibold text-charcoal-900">{deleteConfirmItem.original_path}</span> öğesini
-              çöp kutusundan kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+            <p className="text-sm text-charcoal-600 break-words">
+              <span className="font-semibold text-charcoal-900">{deleteConfirmItem.original_path}</span> öğesini kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
             </p>
 
-            <div className="flex justify-end space-x-2 pt-2">
+            <div className="flex justify-end space-x-2">
               <button
                 type="button"
                 onClick={() => setDeleteConfirmItem(null)}
-                className="px-3.5 py-1.5 text-xs font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg"
+                className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
               >
-                Vazgeç
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handlePermanentDelete}
-                disabled={actionLoadingId !== null}
-                className="px-4 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm disabled:opacity-50"
+                disabled={actionLoadingId === deleteConfirmItem.trash_id}
+                className="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
               >
-                {actionLoadingId !== null ? 'Siliniyor...' : 'Evet, Kalıcı Olarak Sil'}
+                Evet, Kalıcı Olarak Sil
               </button>
             </div>
           </div>
