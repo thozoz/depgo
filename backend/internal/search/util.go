@@ -69,11 +69,11 @@ func updateIgnorePaths(customIgnorePaths string) {
 	if customIgnorePaths != "" {
 		ignorePaths = append(ignorePaths, strings.Split(customIgnorePaths, "\n")...)
 	}
-	conf.SlicesMap[conf.IgnorePaths] = ignorePaths
+	conf.SetSlice(conf.IgnorePaths, ignorePaths)
 }
 
 func isIgnorePath(path string) bool {
-	for _, ignorePath := range conf.SlicesMap[conf.IgnorePaths] {
+	for _, ignorePath := range conf.GetSlice(conf.IgnorePaths) {
 		if strings.HasPrefix(path, ignorePath) {
 			return true
 		}

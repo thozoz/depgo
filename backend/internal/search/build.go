@@ -256,7 +256,7 @@ func Update(parent string, objs []model.Obj) {
 				dir := path.Join(parent, objs[i].GetName())
 				err = BuildIndex(ctx,
 					[]string{dir},
-					conf.SlicesMap[conf.IgnorePaths],
+					conf.GetSlice(conf.IgnorePaths),
 					setting.GetInt(conf.MaxIndexDepth, 20)-strings.Count(dir, "/"), false)
 				if err != nil {
 					log.Errorf("update search index error while build index: %+v", err)

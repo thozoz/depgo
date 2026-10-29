@@ -48,7 +48,7 @@ func ShouldProxy(storage driver.Driver, filename string) bool {
 	} else if storage.Config().MustProxy() || storage.GetStorage().WebProxy {
 		return true
 	}
-	if utils.SliceContains(conf.SlicesMap[conf.ProxyTypes], utils.Ext(filename)) {
+	if utils.SliceContains(conf.GetSlice(conf.ProxyTypes), utils.Ext(filename)) {
 		return true
 	}
 	return false

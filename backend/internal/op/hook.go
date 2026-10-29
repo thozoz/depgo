@@ -35,27 +35,27 @@ type SettingItemHook func(item *model.SettingItem) error
 
 var settingItemHooks = map[string]SettingItemHook{
 	conf.VideoTypes: func(item *model.SettingItem) error {
-		conf.SlicesMap[conf.VideoTypes] = strings.Split(item.Value, ",")
+		conf.SetSlice(conf.VideoTypes, strings.Split(item.Value, ","))
 		return nil
 	},
 	conf.AudioTypes: func(item *model.SettingItem) error {
-		conf.SlicesMap[conf.AudioTypes] = strings.Split(item.Value, ",")
+		conf.SetSlice(conf.AudioTypes, strings.Split(item.Value, ","))
 		return nil
 	},
 	conf.ImageTypes: func(item *model.SettingItem) error {
-		conf.SlicesMap[conf.ImageTypes] = strings.Split(item.Value, ",")
+		conf.SetSlice(conf.ImageTypes, strings.Split(item.Value, ","))
 		return nil
 	},
 	conf.TextTypes: func(item *model.SettingItem) error {
-		conf.SlicesMap[conf.TextTypes] = strings.Split(item.Value, ",")
+		conf.SetSlice(conf.TextTypes, strings.Split(item.Value, ","))
 		return nil
 	},
 	conf.ProxyTypes: func(item *model.SettingItem) error {
-		conf.SlicesMap[conf.ProxyTypes] = strings.Split(item.Value, ",")
+		conf.SetSlice(conf.ProxyTypes, strings.Split(item.Value, ","))
 		return nil
 	},
 	conf.ProxyIgnoreHeaders: func(item *model.SettingItem) error {
-		conf.SlicesMap[conf.ProxyIgnoreHeaders] = strings.Split(item.Value, ",")
+		conf.SetSlice(conf.ProxyIgnoreHeaders, strings.Split(item.Value, ","))
 		return nil
 	},
 	conf.PrivacyRegs: func(item *model.SettingItem) error {
@@ -68,19 +68,20 @@ var settingItemHooks = map[string]SettingItemHook{
 			}
 			regs = append(regs, reg)
 		}
-		conf.PrivacyReg = regs
+		conf.SetPrivacyReg(regs)
 		return nil
 	},
 	conf.FilenameCharMapping: func(item *model.SettingItem) error {
-		err := utils.Json.UnmarshalFromString(item.Value, &conf.FilenameCharMap)
-		if err != nil {
+		parsed := make(map[string]string)
+		if err := utils.Json.UnmarshalFromString(item.Value, &parsed); err != nil {
 			return err
 		}
-		log.Debugf("filename char mapping: %+v", conf.FilenameCharMap)
+		conf.SetFilenameCharMap(parsed)
+		log.Debugf("filename char mapping: %+v", parsed)
 		return nil
 	},
 	conf.IgnoreDirectLinkParams: func(item *model.SettingItem) error {
-		conf.SlicesMap[conf.IgnoreDirectLinkParams] = strings.Split(item.Value, ",")
+		conf.SetSlice(conf.IgnoreDirectLinkParams, strings.Split(item.Value, ","))
 		return nil
 	},
 	conf.DefaultRole: func(item *model.SettingItem) error {

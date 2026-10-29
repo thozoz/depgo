@@ -110,7 +110,7 @@ func down(c *gin.Context, link *model.Link) {
 	c.Header("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate")
 	if setting.GetBool(conf.ForwardDirectLinkParams) {
 		query := c.Request.URL.Query()
-		for _, v := range conf.SlicesMap[conf.IgnoreDirectLinkParams] {
+		for _, v := range conf.GetSlice(conf.IgnoreDirectLinkParams) {
 			query.Del(v)
 		}
 		link.URL, err = utils.InjectQuery(link.URL, query)
@@ -126,7 +126,7 @@ func localProxy(c *gin.Context, link *model.Link, file model.Obj, proxyRange boo
 	var err error
 	if link.URL != "" && setting.GetBool(conf.ForwardDirectLinkParams) {
 		query := c.Request.URL.Query()
-		for _, v := range conf.SlicesMap[conf.IgnoreDirectLinkParams] {
+		for _, v := range conf.GetSlice(conf.IgnoreDirectLinkParams) {
 			query.Del(v)
 		}
 		link.URL, err = utils.InjectQuery(link.URL, query)
@@ -192,10 +192,10 @@ func canProxy(storage driver.Driver, filename string) bool {
 	if storage.GetStorage().Driver == "Quark" && utils.GetFileType(filename) == conf.VIDEO {
 		return true
 	}
-	if utils.SliceContains(conf.SlicesMap[conf.ProxyTypes], utils.Ext(filename)) {
+	if utils.SliceContains(conf.GetSlice(conf.ProxyTypes), utils.Ext(filename)) {
 		return true
 	}
-	if utils.SliceContains(conf.SlicesMap[conf.TextTypes], utils.Ext(filename)) {
+	if utils.SliceContains(conf.GetSlice(conf.TextTypes), utils.Ext(filename)) {
 		return true
 	}
 	return false

@@ -8,7 +8,7 @@ import (
 )
 
 func MappingName(name string) string {
-	for k, v := range conf.FilenameCharMap {
+	for k, v := range conf.GetFilenameCharMap() {
 		name = strings.ReplaceAll(name, k, v)
 	}
 	return name

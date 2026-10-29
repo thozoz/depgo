@@ -40,7 +40,7 @@ func (NoIndex) Search(ctx context.Context, req model.SearchReq) ([]model.SearchN
 		return nil, 0, errors.WithMessagef(err, "failed get dir [%s]", parent)
 	}
 	maxDepth := setting.GetInt(conf.MaxIndexDepth, 20)
-	ignorePaths := conf.SlicesMap[conf.IgnorePaths]
+	ignorePaths := conf.GetSlice(conf.IgnorePaths)
 
 	var nodes []model.SearchNode
 	walkFn := func(reqPath string, info model.Obj) error {

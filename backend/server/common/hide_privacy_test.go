@@ -2,6 +2,7 @@ package common
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/alist-org/alist/v3/internal/conf"
@@ -12,7 +13,10 @@ func TestHidePrivacy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conf.PrivacyReg = []*regexp.Regexp{reg}
+	conf.SetPrivacyReg([]*regexp.Regexp{reg})
+	t.Cleanup(func() { conf.SetPrivacyReg(nil) })
 	res := hidePrivacy(`Get "https://pan.baidu.com/rest/2.0/xpan/file?access_token=121.d1f66e95acfa40274920079396a51c48.Y2aP2vQDq90hLBE3PAbVije59uTcn7GiWUfw8LCM_olw&dir=%2F&limit=200&method=list&order=name&start=0&web=web " : net/http: TLS handshake timeout`)
-	t.Log(res)
+	if strings.Contains(res, "121.d1f66e95acfa40274920079396a51c48") {
+		t.Fatalf("privacy expression did not mask the token: %s", res)
+	}
 }

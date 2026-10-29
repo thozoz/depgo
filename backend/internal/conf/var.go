@@ -2,7 +2,6 @@ package conf
 
 import (
 	"net/url"
-	"regexp"
 )
 
 var (
@@ -18,16 +17,14 @@ var (
 	URL  *url.URL
 )
 
-var SlicesMap = make(map[string][]string)
-var FilenameCharMap = make(map[string]string)
-var PrivacyReg []*regexp.Regexp
+// Settings derived from the database (file type lists, filename character
+// mapping, privacy expressions) live in derived_settings.go behind an RWMutex:
+// they are rewritten on every settings save while request handlers read them.
 
 var (
 	// StoragesLoaded loaded success if empty
 	StoragesLoaded = false
 )
-var (
-	RawIndexHtml string
-	ManageHtml   string
-	IndexHtml    string
-)
+
+// The rendered SPA shells live in index_html.go behind atomic snapshots,
+// because they are rebuilt from settings while requests are being served.

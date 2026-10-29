@@ -31,7 +31,7 @@ func BuildIndex(c *gin.Context) {
 			return
 		}
 		err = search.BuildIndex(context.Background(), []string{"/"},
-			conf.SlicesMap[conf.IgnorePaths], setting.GetInt(conf.MaxIndexDepth, 20), true)
+			conf.GetSlice(conf.IgnorePaths), setting.GetInt(conf.MaxIndexDepth, 20), true)
 		if err != nil {
 			log.Errorf("build index error: %+v", err)
 		}
@@ -63,7 +63,7 @@ func UpdateIndex(c *gin.Context) {
 			}
 		}
 		err := search.BuildIndex(context.Background(), req.Paths,
-			conf.SlicesMap[conf.IgnorePaths], req.MaxDepth, false)
+			conf.GetSlice(conf.IgnorePaths), req.MaxDepth, false)
 		if err != nil {
 			log.Errorf("update index error: %+v", err)
 		}

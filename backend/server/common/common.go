@@ -12,7 +12,7 @@ import (
 )
 
 func hidePrivacy(msg string) string {
-	for _, r := range conf.PrivacyReg {
+	for _, r := range conf.GetPrivacyReg() {
 		msg = r.ReplaceAllStringFunc(msg, func(s string) string {
 			return strings.Repeat("*", len(s))
 		})
