@@ -210,3 +210,11 @@ export interface TextPutResp {
   revision: number;
 }
 
+
+export interface UsageResp {
+  total: number;
+  free: number;
+  files: number;
+  state: number;
+  used: number;
+}

@@ -378,6 +378,7 @@ export const App: React.FC = () => {
             setActiveTab(tab);
             setFilterQuery('');
           }}
+          usageRefreshToken={items}
           isOpenMobile={mobileMenuOpen}
           onCloseMobile={() => setMobileMenuOpen(false)}
         />

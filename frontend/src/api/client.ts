@@ -12,6 +12,7 @@ import {
   PublicShareListResp,
   PublicShareGetResp,
   TrashListResp,
+  UsageResp,
   VersionsResp,
   TextGetResp,
   TextPutResp,
@@ -544,6 +545,12 @@ export const publicShareApi = {
         token,
       }),
     });
+  },
+};
+
+export const usageApi = {
+  async get(): Promise<UsageResp> {
+    return request<UsageResp>('/api/fs/usage', { method: 'GET' });
   },
 };
 

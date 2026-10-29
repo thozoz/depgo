@@ -3,15 +3,20 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { FolderIcon, ShareIcon, TrashIcon, CloseIcon } from './Icons';
 import { useTranslation } from '../utils/i18n';
+import { usageApi } from '../api/client';
+import { UsageResp } from '../types';
+import { formatBytes } from '../utils/format';
 
 interface SidebarProps {
   activeTab: 'files' | 'shares' | 'trash';
   onSelectTab: (tab: 'files' | 'shares' | 'trash') => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
+  // Changes whenever the file list reloads, so the usage figures follow uploads and deletes.
+  usageRefreshToken?: unknown;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -19,8 +24,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   isOpenMobile,
   onCloseMobile,
+  usageRefreshToken,
 }) => {
   const { t } = useTranslation();
+  const [usage, setUsage] = useState<UsageResp | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    usageApi
+      .get()
+      .then((u) => {
+        if (!cancelled) setUsage(u);
+      })
+      .catch(() => {
+        if (!cancelled) setUsage(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [usageRefreshToken]);
+
+  const usedPercent = usage && usage.total > 0 ? Math.min(100, (usage.used / usage.total) * 100) : 0;
+  const nearlyFull = usage ? usage.total > 0 && usage.free / usage.total < 0.1 : false;
 
   const navItems = [
     {
@@ -86,9 +111,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="font-medium text-charcoal-700">{t('nav.storage_quota')}</span>
           <span className="text-[11px] text-accent font-medium">Depgo Local</span>
         </div>
-        <div className="w-full bg-charcoal-100 h-1.5 rounded-full overflow-hidden">
-          <div className="bg-accent h-full rounded-full w-1/4" />
-        </div>
+        {usage ? (
+          <>
+            <div
+              className="w-full bg-charcoal-100 h-1.5 rounded-full overflow-hidden"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(usedPercent)}
+              aria-label={t('nav.storage_quota')}
+            >
+              <div
+                className={`h-full rounded-full ${nearlyFull ? 'bg-red-500' : 'bg-accent'}`}
+                style={{ width: `${Math.max(usedPercent, usage.used > 0 ? 1 : 0)}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-charcoal-700">
+              {t('nav.storage_used_of', { used: formatBytes(usage.used), total: formatBytes(usage.total) })}
+            </p>
+            <p className="text-[11px] text-charcoal-500">
+              {t('nav.storage_free', { free: formatBytes(usage.free) })}
+            </p>
+          </>
+        ) : (
+          <div className="w-full bg-charcoal-100 h-1.5 rounded-full" />
+        )}
       </div>
     </div>
   );

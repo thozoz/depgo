@@ -117,6 +117,7 @@ func _fs(g *gin.RouterGroup) {
 
 	// Depgo lifecycle and editor endpoints (administrator only).
 	adminFs := g.Group("", middlewares.AuthAdmin)
+	adminFs.GET("/usage", handles.FsUsage)
 	adminFs.GET("/trash", handles.FsTrashList)
 	adminFs.POST("/trash/restore", handles.FsTrashRestore)
 	adminFs.POST("/trash/delete", handles.FsTrashDelete)

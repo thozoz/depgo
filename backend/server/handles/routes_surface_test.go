@@ -71,6 +71,7 @@ func TestOnlyDepgoAPIRoutesAreRegistered(t *testing.T) {
 		{"POST", "/api/fs/list"},
 		{"POST", "/api/fs/mkdir"},
 		{"GET", "/api/fs/trash"},
+		{"GET", "/api/fs/usage"},
 		{"GET", "/api/fs/versions"},
 		{"GET", "/api/share/list"},
 		{"GET", "/api/public/share/info?share_id=missing"},

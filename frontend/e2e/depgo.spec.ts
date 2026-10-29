@@ -465,6 +465,18 @@ test.describe.serial('Depgo real browser lifecycle', () => {
     await expect(editor).toBeHidden();
   });
 
+  test('sidebar shows real storage usage', async ({ page }) => {
+    const usage = await call('/api/fs/usage', undefined, 'GET');
+    expect(usage.total).toBeGreaterThan(0);
+    expect(usage.free).toBeLessThanOrEqual(usage.total);
+    expect(usage.used).toBe(usage.files + usage.state);
+    expect(usage.files).toBeGreaterThan(0);
+    const aside = page.locator('aside').first();
+    await expect(aside.getByText(/kullanılıyor/)).toBeVisible();
+    await expect(aside.getByText(/boş$/)).toBeVisible();
+    await expect(aside.getByRole('progressbar')).toBeVisible();
+  });
+
   test('Ctrl+S saves the open text file', async ({ page }) => {
     await page.getByRole('button', { name: 'document.txt', exact: true }).click();
     const editor = page.getByRole('dialog', { name: 'document.txt' });
