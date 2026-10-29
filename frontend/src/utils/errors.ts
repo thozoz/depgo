@@ -1,25 +1,20 @@
 import { ApiError } from '../api/client';
+import { t } from './i18n';
 
 // Every user-facing text for a failed request comes from here. The backend never
 // localises: it answers with a status code and a stable English message, and this
-// module turns them into what the visitor reads. When the site gets its Turkish
-// and English switch, this is the one table that needs translating.
+// module turns them into what the visitor reads using the i18n translation system.
 const BY_MESSAGE: Record<string, string> = {
-  'username or password is incorrect': 'Kullanıcı adı veya parola hatalı.',
-  'password is incorrect': 'Parola hatalı.',
-  'share link already exists': 'Bu bağlantı adı zaten kullanılıyor. Başka bir ad seçin.',
+  'username or password is incorrect': 'error.incorrect_credentials',
+  'password is incorrect': 'error.incorrect_password',
+  'share link already exists': 'error.share_already_exists',
 };
-
-const TOO_MANY_ATTEMPTS = 'Çok fazla hatalı deneme yapıldı. Lütfen biraz sonra tekrar deneyin.';
-const SHARE_NOT_FOUND =
-  'Bu paylaşım bulunamadı. Silinmiş ya da kapatılmış olabilir; tek okumalık bir bağlantı ise zaten kullanılmış olabilir.';
-const SHARE_EXPIRED = 'Bu paylaşımın süresi dolmuş veya kullanım hakkı bitmiş.';
 
 export function describeError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
-    const known = BY_MESSAGE[err.message];
-    if (known) return known;
-    if (err.code === 429) return TOO_MANY_ATTEMPTS;
+    const key = BY_MESSAGE[err.message];
+    if (key) return t(key);
+    if (err.code === 429) return t('error.too_many_attempts');
     return err.message;
   }
   return err instanceof Error ? err.message : fallback;
@@ -30,8 +25,8 @@ export function describeError(err: unknown, fallback: string): string {
 // outside, and none of them should say which it was.
 export function describeShareError(err: unknown, fallback: string): string {
   if (err instanceof ApiError && !BY_MESSAGE[err.message]) {
-    if (err.code === 404) return SHARE_NOT_FOUND;
-    if (err.code === 410) return SHARE_EXPIRED;
+    if (err.code === 404) return t('error.share_not_found');
+    if (err.code === 410) return t('error.share_expired');
   }
   return describeError(err, fallback);
 }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { User } from '../types';
 import { GridIcon, ListIcon, LogoutIcon, MenuIcon } from './Icons';
+import { useTranslation } from '../utils/i18n';
 
 interface NavbarProps {
   user: User | null;
@@ -17,6 +18,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenMobileMenu,
 }) => {
+  const { t, lang, setLanguage } = useTranslation();
+
   return (
     <header className="h-14 bg-white border-b border-charcoal-200 px-4 flex items-center justify-between sticky top-0 z-20">
       <div className="flex items-center space-x-3">
@@ -43,13 +46,37 @@ export const Navbar: React.FC<NavbarProps> = ({
           type="button"
           onClick={onToggleViewMode}
           className="p-2 text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-lg transition-colors"
-          title={viewMode === 'list' ? 'Izgara Görünümü' : 'Liste Görünümü'}
-          aria-label={viewMode === 'list' ? 'Izgara görünümüne geç' : 'Liste görünümüne geç'}
+          title={viewMode === 'list' ? t('nav.view_grid') : t('nav.view_list')}
+          aria-label={viewMode === 'list' ? t('nav.view_grid') : t('nav.view_list')}
         >
           {viewMode === 'list' ? <GridIcon className="w-4 h-4" /> : <ListIcon className="w-4 h-4" />}
         </button>
 
         <div className="h-5 w-px bg-charcoal-200 mx-1" />
+
+        {/* Language switch */}
+        <div className="flex items-center rounded-lg border border-charcoal-200 p-0.5 text-xs font-medium bg-warm-50 text-charcoal-600">
+          <button
+            type="button"
+            onClick={() => setLanguage('tr')}
+            className={`px-1.5 py-0.5 rounded transition-all ${
+              lang === 'tr' ? 'bg-white font-semibold text-charcoal-900 shadow-sm' : 'hover:text-charcoal-900'
+            }`}
+            aria-label="Türkçe"
+          >
+            TR
+          </button>
+          <button
+            type="button"
+            onClick={() => setLanguage('en')}
+            className={`px-1.5 py-0.5 rounded transition-all ${
+              lang === 'en' ? 'bg-white font-semibold text-charcoal-900 shadow-sm' : 'hover:text-charcoal-900'
+            }`}
+            aria-label="English"
+          >
+            EN
+          </button>
+        </div>
 
         {user && (
           <div className="flex items-center space-x-2">
@@ -60,10 +87,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onLogout}
               className="flex items-center space-x-1.5 px-2.5 py-1.5 text-sm text-charcoal-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-              title="Çıkış Yap"
+              title={t('nav.logout')}
             >
               <LogoutIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">Çıkış</span>
+              <span className="hidden sm:inline">{t('nav.logout')}</span>
             </button>
           </div>
         )}
