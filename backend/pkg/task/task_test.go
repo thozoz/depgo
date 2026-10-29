@@ -25,12 +25,12 @@ func TestTask_Manager(t *testing.T) {
 		t.Fatal("task not found")
 	}
 	time.Sleep(time.Millisecond * 100)
-	if task.state != RUNNING {
-		t.Errorf("task status not running: %s", task.state)
+	if task.GetState() != RUNNING {
+		t.Errorf("task status not running: %s", task.GetState())
 	}
 	time.Sleep(time.Second)
-	if task.state != SUCCEEDED {
-		t.Errorf("task status not finished: %s", task.state)
+	if task.GetState() != SUCCEEDED {
+		t.Errorf("task status not finished: %s", task.GetState())
 	}
 }
 
@@ -57,8 +57,8 @@ func TestTask_Cancel(t *testing.T) {
 	time.Sleep(time.Microsecond * 50)
 	task.Cancel()
 	time.Sleep(time.Millisecond)
-	if task.state != CANCELED {
-		t.Errorf("task status not canceled: %s", task.state)
+	if task.GetState() != CANCELED {
+		t.Errorf("task status not canceled: %s", task.GetState())
 	}
 }
 
@@ -82,15 +82,15 @@ func TestTask_Retry(t *testing.T) {
 		t.Fatal("task not found")
 	}
 	time.Sleep(time.Millisecond)
-	if task.Error == nil {
-		t.Error(task.state)
+	if task.GetErr() == nil {
+		t.Error(task.GetState())
 		t.Fatal("task error is nil, but expected error")
 	} else {
-		t.Logf("task error: %s", task.Error)
+		t.Logf("task error: %s", task.GetErr())
 	}
 	task.retry()
 	time.Sleep(time.Millisecond)
-	if task.Error != nil {
-		t.Errorf("task error: %+v, but expected nil", task.Error)
+	if task.GetErr() != nil {
+		t.Errorf("task error: %+v, but expected nil", task.GetErr())
 	}
 }
