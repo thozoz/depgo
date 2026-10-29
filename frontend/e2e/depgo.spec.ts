@@ -441,4 +441,27 @@ test.describe.serial('Depgo real browser lifecycle', () => {
     await expect(page.getByRole('dialog', { name: 'document.txt' })).toBeVisible();
     expect(await download).toBe(false);
   });
+
+  test('clicking outside the editor closes it, but asks first when there are unsaved changes', async ({ page }) => {
+    const open = async () => {
+      await page.getByRole('button', { name: 'document.txt', exact: true }).click();
+      const editor = page.getByRole('dialog', { name: 'document.txt' });
+      await expect(editor).toBeVisible();
+      return editor;
+    };
+    let editor = await open();
+    await page.mouse.click(5, 5);
+    await expect(editor).toBeHidden();
+
+    editor = await open();
+    await editor.getByLabel('Metin düzenleyici içeriği').fill('unsaved edit');
+    let asked = false;
+    page.once('dialog', (d) => { asked = true; void d.dismiss(); });
+    await page.mouse.click(5, 5);
+    await expect.poll(() => asked).toBe(true);
+    await expect(editor).toBeVisible();
+    page.once('dialog', (d) => void d.accept());
+    await editor.getByRole('button', { name: 'İptal' }).click();
+    await expect(editor).toBeHidden();
+  });
 });

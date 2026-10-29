@@ -30,6 +30,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
   const [conflict, setConflict] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const backdropPressRef = useRef(false);
   const titleId = React.useId();
 
   const isDirty = content !== initialContent;
@@ -130,6 +131,14 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
       aria-modal="true"
       aria-labelledby={titleId}
       className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-charcoal-900/60 backdrop-blur-sm"
+      onMouseDown={(e) => {
+        backdropPressRef.current = e.target === e.currentTarget;
+      }}
+      onClick={(e) => {
+        // Only a press that started on the backdrop closes it, so dragging a text
+        // selection out of the textarea and releasing outside does not.
+        if (e.target === e.currentTarget && backdropPressRef.current) handleAttemptClose();
+      }}
     >
       <div className="bg-white rounded-2xl shadow-2xl border border-charcoal-200 w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
