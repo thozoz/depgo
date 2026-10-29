@@ -174,6 +174,13 @@ export const authApi = {
     }
   },
 
+  async updateMe(body: { username?: string; password?: string; current_password?: string }): Promise<void> {
+    await request<void>('/api/me/update', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
   isAuthenticated(): boolean {
     return !!getStoredToken();
   },

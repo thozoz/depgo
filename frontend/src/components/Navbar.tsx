@@ -1,20 +1,18 @@
 import React from 'react';
 import { User } from '../types';
-import { GridIcon, ListIcon, LogoutIcon, MenuIcon } from './Icons';
+import { LogoutIcon, MenuIcon } from './Icons';
 import { useTranslation } from '../utils/i18n';
 
 interface NavbarProps {
   user: User | null;
-  viewMode: 'list' | 'grid';
-  onToggleViewMode: () => void;
+  onOpenAccount: () => void;
   onLogout: () => void;
   onOpenMobileMenu?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   user,
-  viewMode,
-  onToggleViewMode,
+  onOpenAccount,
   onLogout,
   onOpenMobileMenu,
 }) => {
@@ -42,17 +40,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div className="flex items-center space-x-2">
-        <button
-          type="button"
-          onClick={onToggleViewMode}
-          className="p-2 text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-lg transition-colors"
-          title={viewMode === 'list' ? t('nav.view_grid') : t('nav.view_list')}
-          aria-label={viewMode === 'list' ? t('nav.view_grid') : t('nav.view_list')}
-        >
-          {viewMode === 'list' ? <GridIcon className="w-4 h-4" /> : <ListIcon className="w-4 h-4" />}
-        </button>
-
-        <div className="h-5 w-px bg-charcoal-200 mx-1" />
 
         {/* Language switch */}
         <div className="flex items-center rounded-lg border border-charcoal-200 p-0.5 text-xs font-medium bg-warm-50 text-charcoal-600">
@@ -80,9 +67,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {user && (
           <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-charcoal-700 hidden sm:inline-block">
+            <button
+              type="button"
+              onClick={onOpenAccount}
+              className="text-sm font-medium text-charcoal-700 hover:text-accent hover:bg-charcoal-100 px-2 py-1.5 rounded-lg transition-colors"
+              title={t('account.title')}
+              aria-label={t('account.title')}
+            >
               {user.username}
-            </span>
+            </button>
             <button
               type="button"
               onClick={onLogout}

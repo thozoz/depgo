@@ -434,4 +434,11 @@ test.describe.serial('Depgo real browser lifecycle', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'tr');
     await page.getByRole('button', { name: 'Dosyalar', exact: true }).click();
   });
+
+  test('clicking a text file name opens the editor instead of downloading', async ({ page }) => {
+    const download = page.waitForEvent('download', { timeout: 1500 }).then(() => true, () => false);
+    await page.getByRole('button', { name: 'document.txt', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'document.txt' })).toBeVisible();
+    expect(await download).toBe(false);
+  });
 });

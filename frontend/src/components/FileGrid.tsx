@@ -298,6 +298,8 @@ export const FileGrid: React.FC<FileGridProps> = ({
                   onOpenFolder(item);
                 } else if (previewEligible) {
                   onPreview(item);
+                } else if (onEdit && isEditableTextFile(item.name)) {
+                  onEdit(item);
                 } else {
                   onDownload(item);
                 }

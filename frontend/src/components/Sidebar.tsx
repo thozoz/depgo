@@ -96,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:block flex-shrink-0 h-full">
+      <aside className="hidden md:flex flex-shrink-0">
         {content}
       </aside>
 

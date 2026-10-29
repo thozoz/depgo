@@ -17,7 +17,7 @@ export const FilterInput: React.FC<FilterInputProps> = ({
   const inputPlaceholder = placeholder || t('files.filter_placeholder');
 
   return (
-    <div className="relative flex items-center w-full min-w-0 sm:max-w-xs">
+    <div className="relative flex items-center w-full min-w-0 sm:w-56">
       <div className="absolute left-3 text-charcoal-400 pointer-events-none">
         <SearchIcon className="w-4 h-4" />
       </div>

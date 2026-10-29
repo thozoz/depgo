@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { User, FileItem } from './types';
-import { authApi, fsApi, setOnAuthFailure } from './api/client';
+import { authApi, fsApi, setOnAuthFailure, setStoredToken } from './api/client';
 import { joinPath } from './utils/format';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -21,6 +21,7 @@ import { TextEditorModal } from './components/TextEditorModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { GuestShareView } from './components/GuestShareView';
 import { LoginView } from './components/LoginView';
+import { AccountModal } from './components/AccountModal';
 import { SelectionBar } from './components/SelectionBar';
 import { ContextMenu, ContextMenuPosition } from './components/ContextMenu';
 import { DragPreview } from './components/DragPreview';
@@ -84,6 +85,7 @@ export const App: React.FC = () => {
 
   const [filterQuery, setFilterQuery] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [accountOpen, setAccountOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -361,11 +363,10 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-warm-50 flex flex-col">
+    <div className="h-screen bg-warm-50 flex flex-col">
       <Navbar
         user={user}
-        viewMode={viewMode}
-        onToggleViewMode={() => setViewMode((prev) => (prev === 'list' ? 'grid' : 'list'))}
+        onOpenAccount={() => setAccountOpen(true)}
         onLogout={handleLogout}
         onOpenMobileMenu={() => setMobileMenuOpen(true)}
       />
@@ -396,7 +397,7 @@ export const App: React.FC = () => {
                     />
                   </div>
 
-                  <div className="flex items-center flex-wrap gap-2 flex-shrink-0">
+                  <div className="flex items-center flex-wrap lg:flex-nowrap gap-2 flex-shrink-0 md:ml-auto">
                     <button
                       type="button"
                       onClick={() => setNewFolderOpen(true)}
@@ -614,6 +615,18 @@ export const App: React.FC = () => {
         ref={dragPreviewRef}
         names={draggedItems.map((i) => i.name)}
         isFolder={draggedItems.length === 1 && draggedItems[0].is_dir}
+      />
+
+      <AccountModal
+        isOpen={accountOpen}
+        user={user}
+        onClose={() => setAccountOpen(false)}
+        onSessionEnded={() => {
+          setStoredToken(null);
+          setAccountOpen(false);
+          setIsAuthenticated(false);
+          setUser(null);
+        }}
       />
 
       <ShareModal

@@ -8,6 +8,9 @@ const BY_MESSAGE: Record<string, string> = {
   'username or password is incorrect': 'error.incorrect_credentials',
   'password is incorrect': 'error.incorrect_password',
   'share link already exists': 'error.share_already_exists',
+  'current password is incorrect': 'error.current_password_incorrect',
+  'current password is required to set a new one': 'error.current_password_incorrect',
+  'username is already taken': 'error.username_taken',
 };
 
 export function describeError(err: unknown, fallback: string): string {
