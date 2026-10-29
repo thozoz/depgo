@@ -14,7 +14,6 @@ import (
 
 	"github.com/alist-org/alist/v3/internal/db"
 	"github.com/alist-org/alist/v3/internal/model"
-	"github.com/alist-org/alist/v3/internal/op"
 	shareauth "github.com/alist-org/alist/v3/internal/share"
 	"github.com/alist-org/alist/v3/server/handles"
 	"github.com/stretchr/testify/assert"
@@ -406,60 +405,6 @@ func TestShareInfoWithTokenDoesNotLeakForOtherShare(t *testing.T) {
 	assert.False(t, resp.Data.Authed, "share A's token must not authenticate share B")
 	assert.Empty(t, resp.Data.Name, "a locked share must not disclose its name")
 	assert.NotEqual(t, shareA, shareB)
-}
-
-// TestPublicSettingsLeaksNoInternals asserts the unauthenticated settings
-// endpoint exposes only the allow-listed keys and no version string.
-func TestPublicSettingsLeaksNoInternals(t *testing.T) {
-	r, _, _, _, _ := setupTestServer(t)
-
-	// Seed one allow-listed key and several internal keys as public settings;
-	// only the allow-listed one may come back over the wire.
-	for key, value := range map[string]string{
-		"site_title":            "Depgo",
-		"version":               "v3.99.0-secret",
-		"hide_files":            "/secret-regex/i",
-		"ocr_api":               "https://internal.example/ocr",
-		"filename_char_mapping": `{"/": "|"}`,
-		"customize_head":        "<script>internal</script>",
-	} {
-		require.NoError(t, op.SaveSettingItem(&model.SettingItem{
-			Key:   key,
-			Value: value,
-			Flag:  model.PUBLIC,
-		}))
-	}
-	op.SettingCacheUpdate()
-
-	req := httptest.NewRequest("GET", "/api/public/settings", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	require.Equal(t, 200, parseRespCode(t, w))
-
-	var resp struct {
-		Data map[string]string `json:"data"`
-	}
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-
-	forbidden := []string{
-		"version",
-		"hide_files",
-		"privacy_regs",
-		"ocr_api",
-		"filename_char_mapping",
-		"customize_head",
-		"customize_body",
-		"max_devices",
-		"device_session_ttl",
-	}
-	for _, key := range forbidden {
-		_, present := resp.Data[key]
-		assert.Falsef(t, present, "public settings must not expose %q", key)
-	}
-	// A harmless key must still be there, proving the endpoint is not simply
-	// returning nothing.
-	_, hasTitle := resp.Data["site_title"]
-	assert.True(t, hasTitle, "public settings should still expose site_title")
 }
 
 // TestAssetsDirectoryListingIsDisabled asserts the /assets/ autoindex is gone

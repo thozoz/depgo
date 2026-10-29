@@ -138,6 +138,12 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 			c.Status(405)
 			return
 		}
+		// An API path that is not registered is a 404, not the SPA shell: answering
+		// 200 with HTML made a removed endpoint look like it still existed.
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") {
+			c.String(404, "404 page not found")
+			return
+		}
 		c.Header("Content-Type", "text/html")
 		c.Status(200)
 		if strings.HasPrefix(c.Request.URL.Path, "/@manage") {

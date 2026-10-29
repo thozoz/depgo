@@ -3,7 +3,6 @@ package server
 import (
 	"github.com/alist-org/alist/v3/cmd/flags"
 	"github.com/alist-org/alist/v3/internal/conf"
-	"github.com/alist-org/alist/v3/internal/message"
 	"github.com/alist-org/alist/v3/internal/sign"
 	"github.com/alist-org/alist/v3/internal/stream"
 	"github.com/alist-org/alist/v3/pkg/utils"
@@ -37,7 +36,6 @@ func Init(e *gin.Engine) {
 	})
 	g.GET("/favicon.ico", handles.Favicon)
 	g.GET("/robots.txt", handles.Robots)
-	g.GET("/i/:link_name", handles.Plist)
 	common.SecretKey = []byte(conf.Conf.JwtSecret)
 	g.Use(middlewares.StoragesLoaded)
 	if conf.Conf.MaxConnections > 0 {
@@ -63,57 +61,27 @@ func Init(e *gin.Engine) {
 	g.GET("/sp/:share_id/*path", downloadLimiter, handles.ShareProxy)
 	g.HEAD("/sp/:share_id", handles.ShareProxy)
 	g.HEAD("/sp/:share_id/*path", handles.ShareProxy)
-	archiveSignCheck := middlewares.Down(sign.VerifyArchive)
-	g.GET("/ad/*path", archiveSignCheck, downloadLimiter, handles.ArchiveDown)
-	g.GET("/ap/*path", archiveSignCheck, downloadLimiter, handles.ArchiveProxy)
-	g.GET("/ae/*path", archiveSignCheck, downloadLimiter, handles.ArchiveInternalExtract)
-	g.HEAD("/ad/*path", archiveSignCheck, handles.ArchiveDown)
-	g.HEAD("/ap/*path", archiveSignCheck, handles.ArchiveProxy)
-	g.HEAD("/ae/*path", archiveSignCheck, handles.ArchiveInternalExtract)
 
 	api := g.Group("/api")
 	auth := api.Group("", middlewares.Auth)
-	webauthn := api.Group("/authn", middlewares.Authn)
 
+	// Depgo exposes only what its own UI uses and what works on a local disk with
+	// one administrator. The rest of the AList management API (users, roles,
+	// storages and drivers, settings, offline download, search index, labels,
+	// tasks, SSO/LDAP/WebAuthn, archive extraction, ...) is not registered: those
+	// endpoints either cannot work here or answer with plausible-looking data that
+	// has nothing to do with this deployment.
 	api.POST("/auth/login", middlewares.NoStore(), handles.Login)
 	api.POST("/auth/login/hash", middlewares.NoStore(), handles.LoginHash)
-	api.POST("/auth/login/ldap", middlewares.NoStore(), handles.LoginLdap)
-	api.POST("/auth/register", func(c *gin.Context) {
-		common.ErrorStrResp(c, "registration is disabled", 403)
-	})
 	auth.GET("/me", handles.CurrentUser)
 	auth.POST("/me/update", handles.UpdateCurrent)
-	auth.GET("/me/sshkey/list", handles.ListMyPublicKey)
-	auth.POST("/me/sshkey/add", handles.AddMyPublicKey)
-	auth.POST("/me/sshkey/delete", handles.DeleteMyPublicKey)
-	auth.POST("/auth/2fa/generate", handles.Generate2FA)
-	auth.POST("/auth/2fa/verify", handles.Verify2FA)
 	auth.GET("/auth/logout", handles.LogOut)
 	auth.GET("/me/sessions", handles.ListMySessions)
 	auth.POST("/me/sessions/evict", handles.EvictMySession)
 
-	// auth
-	api.GET("/auth/sso", handles.SSOLoginRedirect)
-	api.GET("/auth/sso_callback", handles.SSOLoginCallback)
-	api.GET("/auth/get_sso_id", handles.SSOLoginCallback)
-	api.GET("/auth/sso_get_token", handles.SSOLoginCallback)
-
-	// webauthn
-	api.GET("/authn/webauthn_begin_login", handles.BeginAuthnLogin)
-	api.POST("/authn/webauthn_finish_login", handles.FinishAuthnLogin)
-	webauthn.GET("/webauthn_begin_registration", handles.BeginAuthnRegistration)
-	webauthn.POST("/webauthn_finish_registration", handles.FinishAuthnRegistration)
-	webauthn.POST("/delete_authn", handles.DeleteAuthnLogin)
-	webauthn.GET("/getcredentials", handles.GetAuthnCredentials)
-
-	// no need auth
-	public := api.Group("/public")
-	public.Any("/settings", handles.PublicSettings)
-	public.Any("/offline_download_tools", handles.OfflineDownloadTools)
-	public.Any("/archive_extensions", handles.ArchiveExtensions)
 	// Share responses carry or validate an access token, so they must never be
 	// cached by a proxy or the browser.
-	sharePublic := public.Group("", middlewares.NoStore())
+	sharePublic := api.Group("/public", middlewares.NoStore())
 	sharePublic.GET("/share/info", handles.GetPublicShareInfo)
 	sharePublic.POST("/share/auth", handles.AuthPublicShare)
 	sharePublic.POST("/share/list", handles.ListPublicShare)
@@ -126,10 +94,6 @@ func Init(e *gin.Engine) {
 	share.POST("/disable", handles.DisableShare)
 	share.GET("/list", handles.ListShares)
 	share.POST("/delete", handles.DeleteShare)
-	_task(auth.Group("/task", middlewares.AuthNotGuest))
-	_label(auth.Group("/label"))
-	_labelFileBinding(auth.Group("/label_file_binding"))
-	admin(auth.Group("/admin", middlewares.AuthAdmin))
 	if flags.Debug || flags.Dev {
 		debug(g.Group("/debug"))
 	}
@@ -138,128 +102,19 @@ func Init(e *gin.Engine) {
 	})
 }
 
-func admin(g *gin.RouterGroup) {
-	meta := g.Group("/meta")
-	meta.GET("/list", handles.ListMetas)
-	meta.GET("/get", handles.GetMeta)
-	meta.POST("/create", handles.CreateMeta)
-	meta.POST("/update", handles.UpdateMeta)
-	meta.POST("/delete", handles.DeleteMeta)
-
-	user := g.Group("/user")
-	user.GET("/list", handles.ListUsers)
-	user.GET("/get", handles.GetUser)
-	user.POST("/create", handles.CreateUser)
-	user.POST("/update", handles.UpdateUser)
-	user.POST("/cancel_2fa", handles.Cancel2FAById)
-	user.POST("/delete", handles.DeleteUser)
-	user.POST("/del_cache", handles.DelUserCache)
-	user.GET("/sshkey/list", handles.ListPublicKeys)
-	user.POST("/sshkey/delete", handles.DeletePublicKey)
-
-	role := g.Group("/role")
-	role.GET("/list", handles.ListRoles)
-	role.GET("/get", handles.GetRole)
-	role.POST("/create", handles.CreateRole)
-	role.POST("/update", handles.UpdateRole)
-	role.POST("/delete", handles.DeleteRole)
-
-	storage := g.Group("/storage")
-	storage.GET("/list", handles.ListStorages)
-	storage.GET("/get", handles.GetStorage)
-	storage.POST("/create", handles.CreateStorage)
-	storage.POST("/update", handles.UpdateStorage)
-	storage.POST("/delete", handles.DeleteStorage)
-	storage.POST("/enable", handles.EnableStorage)
-	storage.POST("/disable", handles.DisableStorage)
-	storage.POST("/load_all", handles.LoadAllStorages)
-
-	driver := g.Group("/driver")
-	driver.GET("/list", handles.ListDriverInfo)
-	driver.GET("/names", handles.ListDriverNames)
-	driver.GET("/info", handles.GetDriverInfo)
-
-	setting := g.Group("/setting")
-	setting.GET("/get", handles.GetSetting)
-	setting.GET("/list", handles.ListSettings)
-	setting.POST("/save", handles.SaveSettings)
-	setting.POST("/delete", handles.DeleteSetting)
-	setting.POST("/reset_token", handles.ResetToken)
-	setting.POST("/set_token", handles.SetToken)
-	setting.POST("/set_aria2", handles.SetAria2)
-	setting.POST("/set_qbit", handles.SetQbittorrent)
-	setting.POST("/set_transmission", handles.SetTransmission)
-	setting.POST("/set_115", handles.Set115)
-	setting.POST("/set_pikpak", handles.SetPikPak)
-	setting.POST("/set_thunder", handles.SetThunder)
-	setting.POST("/set_guangyapan", handles.SetGuangYaPan)
-	setting.POST("/set_123_open", handles.SetOpen123)
-	setting.POST("/set_frp", handles.SetFRP)
-	setting.POST("/stop_frp", handles.StopFRP)
-	setting.GET("/frp_runtime", handles.GetFRPRuntime)
-
-	// retain /admin/task API to ensure compatibility with legacy automation scripts
-	_task(g.Group("/task"))
-
-	ms := g.Group("/message")
-	ms.POST("/get", message.HttpInstance.GetHandle)
-	ms.POST("/send", message.HttpInstance.SendHandle)
-
-	index := g.Group("/index")
-	index.POST("/build", middlewares.SearchIndex, handles.BuildIndex)
-	index.POST("/update", middlewares.SearchIndex, handles.UpdateIndex)
-	index.POST("/stop", middlewares.SearchIndex, handles.StopIndex)
-	index.POST("/clear", middlewares.SearchIndex, handles.ClearIndex)
-	index.GET("/progress", middlewares.SearchIndex, handles.GetProgress)
-
-	label := g.Group("/label")
-	label.POST("/create", handles.CreateLabel)
-	label.POST("/update", handles.UpdateLabel)
-	label.POST("/delete", handles.DeleteLabel)
-
-	labelFileBinding := g.Group("/label_file_binding")
-	labelFileBinding.GET("/list", handles.ListLabelFileBinding)
-	labelFileBinding.POST("/create", handles.CreateLabelFileBinDing)
-	labelFileBinding.POST("/create_batch", handles.CreateLabelFileBinDingBatch)
-	labelFileBinding.POST("/delete", handles.DelLabelByFileName)
-	labelFileBinding.POST("/restore", handles.RestoreLabelFileBinding)
-
-	session := g.Group("/session")
-	session.GET("/list", handles.ListSessions)
-	session.POST("/evict", handles.EvictSession)
-
-}
-
 func _fs(g *gin.RouterGroup) {
 	g.Any("/list", handles.FsList)
-	g.Any("/search", middlewares.SearchIndex, handles.Search)
 	g.Any("/get", handles.FsGet)
-	g.Any("/other", handles.FsOther)
-	g.GET("/lark/export/download", handles.LarkExportDownload)
 	g.Any("/dirs", handles.FsDirs)
 	g.POST("/mkdir", handles.FsMkdir)
 	g.POST("/rename", handles.FsRename)
-	g.POST("/batch_rename", handles.FsBatchRename)
-	g.POST("/regex_rename", handles.FsRegexRename)
 	g.POST("/move", handles.FsMove)
-	g.POST("/recursive_move", handles.FsRecursiveMove)
-	g.POST("/copy", handles.FsCopy)
 	g.POST("/remove", handles.FsRemove)
-	g.POST("/remove_empty_directory", handles.FsRemoveEmptyDirectory)
 	uploadLimiter := middlewares.UploadRateLimiter(stream.ClientUploadLimit)
 	g.PUT("/put", middlewares.FsUp, uploadLimiter, handles.FsStream)
 	g.PUT("/form", middlewares.FsUp, uploadLimiter, handles.FsForm)
-	g.POST("/link", middlewares.AuthAdmin, handles.Link)
-	// g.POST("/add_aria2", handles.AddOfflineDownload)
-	// g.POST("/add_qbit", handles.AddQbittorrent)
-	// g.POST("/add_transmission", handles.SetTransmission)
-	g.POST("/add_offline_download", handles.AddOfflineDownload)
-	a := g.Group("/archive")
-	a.Any("/meta", handles.FsArchiveMeta)
-	a.Any("/list", handles.FsArchiveList)
-	a.POST("/decompress", handles.FsArchiveDecompress)
 
-	// Depgo lifecycle & editor endpoints (AuthAdmin only)
+	// Depgo lifecycle and editor endpoints (administrator only).
 	adminFs := g.Group("", middlewares.AuthAdmin)
 	adminFs.GET("/trash", handles.FsTrashList)
 	adminFs.POST("/trash/restore", handles.FsTrashRestore)
@@ -268,20 +123,6 @@ func _fs(g *gin.RouterGroup) {
 	adminFs.POST("/versions/restore", handles.FsVersionsRestore)
 	adminFs.GET("/text", handles.FsTextGet)
 	adminFs.PUT("/text", handles.FsTextPut)
-}
-
-func _task(g *gin.RouterGroup) {
-	handles.SetupTaskRoute(g)
-}
-
-func _label(g *gin.RouterGroup) {
-	g.GET("/list", handles.ListLabel)
-	g.GET("/get", handles.GetLabel)
-}
-
-func _labelFileBinding(g *gin.RouterGroup) {
-	g.GET("/get", handles.GetLabelByFileName)
-	g.GET("/get_file_by_label", handles.GetFileByLabel)
 }
 
 func Cors(r *gin.Engine) {
