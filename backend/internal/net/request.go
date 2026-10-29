@@ -192,7 +192,15 @@ func (d *downloader) download() (io.ReadCloser, error) {
 	d.concurrency = d.cfg.Concurrency
 	d.sendChunkTask(true)
 
-	var rc io.ReadCloser = NewMultiReadCloser(d.bufs[0], d.interrupt, d.finishBuf)
+	// Read the first buffer under the same lock sendChunkTask uses to append to
+	// d.bufs. Worker goroutines append to that slice while the download runs, so an
+	// unguarded read here races with them: the slice header can be observed
+	// half-updated, and the race detector flags it.
+	d.m.Lock()
+	firstBuf := d.bufs[0]
+	d.m.Unlock()
+
+	var rc io.ReadCloser = NewMultiReadCloser(firstBuf, d.interrupt, d.finishBuf)
 
 	// Return error
 	return rc, d.err

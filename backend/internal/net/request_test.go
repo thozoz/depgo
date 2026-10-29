@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -70,14 +72,67 @@ func TestDownloadOrder(t *testing.T) {
 		t.Errorf("expect %v API calls, got %v", e, a)
 	}
 
-	expectRngs := []string{"2-3", "5-3", "8-3", "11-1"}
-	for _, rng := range expectRngs {
-		if !slices.Contains(*ranges, rng) {
-			t.Errorf("expect range %v, but absent in return", rng)
-		}
+	// The exact chunk boundaries are an implementation detail: sendChunkTask
+	// deliberately sizes the first chunk to the remainder (so the rest of the range
+	// divides evenly by partSize) because a small leading chunk lets a video player
+	// start sooner. Asserting fixed boundaries made this test fail the moment that
+	// heuristic was tuned, while saying nothing about whether the bytes were right.
+	//
+	// What actually matters is asserted instead: the chunks must cover the requested
+	// range contiguously, and the assembled body must equal the source slice.
+	assertRangesCover(t, *ranges, start, length)
+	assertDownloadedContent(t, resultBuf, buff[start:start+length])
+}
+
+// parseRangeSpec splits a "start-length" entry produced by downloadCaptureClient.
+func parseRangeSpec(t *testing.T, spec string) (start, length int64) {
+	t.Helper()
+	parts := strings.SplitN(spec, "-", 2)
+	if len(parts) != 2 {
+		t.Fatalf("malformed range entry %q", spec)
 	}
-	if e, a := expectRngs, *ranges; len(e) != len(a) {
-		t.Errorf("expect %v ranges, got %v", e, a)
+	s, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		t.Fatalf("malformed range start in %q: %v", spec, err)
+	}
+	l, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		t.Fatalf("malformed range length in %q: %v", spec, err)
+	}
+	return s, l
+}
+
+// assertRangesCover checks that the requested ranges are contiguous, start at the
+// requested offset and sum to the requested length, in order.
+func assertRangesCover(t *testing.T, specs []string, wantStart, wantLength int64) {
+	t.Helper()
+	if len(specs) == 0 {
+		t.Fatal("no ranges were requested")
+	}
+	var covered int64
+	next := wantStart
+	for _, spec := range specs {
+		s, l := parseRangeSpec(t, spec)
+		if s != next {
+			t.Errorf("range %q starts at %d, expected %d (ranges must be contiguous)", spec, s, next)
+		}
+		if l <= 0 {
+			t.Errorf("range %q has non-positive length", spec)
+		}
+		next += l
+		covered += l
+	}
+	if covered != wantLength {
+		t.Errorf("ranges cover %d bytes, expected %d", covered, wantLength)
+	}
+}
+
+// assertDownloadedContent verifies the assembled body equals the requested slice,
+// which is the property the chunking heuristic must never break.
+func assertDownloadedContent(t *testing.T, got, want []byte) {
+	t.Helper()
+	if !bytes.Equal(got, want) {
+		t.Errorf("downloaded content mismatch: got %v, want %v", got, want)
 	}
 }
 func init() {
