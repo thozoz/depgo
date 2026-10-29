@@ -464,4 +464,15 @@ test.describe.serial('Depgo real browser lifecycle', () => {
     await editor.getByRole('button', { name: 'İptal' }).click();
     await expect(editor).toBeHidden();
   });
+
+  test('Ctrl+S saves the open text file', async ({ page }) => {
+    await page.getByRole('button', { name: 'document.txt', exact: true }).click();
+    const editor = page.getByRole('dialog', { name: 'document.txt' });
+    const area = editor.getByLabel('Metin düzenleyici içeriği');
+    const next = `${await area.inputValue()}\nsaved with ctrl+s`;
+    await area.fill(next);
+    await area.press('Control+s');
+    await expect.poll(async () => (await text()).content).toBe(next);
+    await expect(editor.getByRole('button', { name: 'Kaydet' })).toBeDisabled();
+  });
 });

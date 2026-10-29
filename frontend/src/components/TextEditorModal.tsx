@@ -31,6 +31,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const backdropPressRef = useRef(false);
+  const saveShortcutRef = useRef<() => void>(() => {});
   const titleId = React.useId();
 
   const isDirty = content !== initialContent;
@@ -82,6 +83,10 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         handleAttemptClose();
+      } else if (isOpen && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        // Stop the browser's "save page" dialog; save the document instead.
+        e.preventDefault();
+        saveShortcutRef.current();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -119,6 +124,10 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
       return;
     }
     await loadText();
+  };
+
+  saveShortcutRef.current = () => {
+    if (isDirty && !saving && !loading) void handleSave();
   };
 
   if (!isOpen) return null;
