@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { FolderIcon } from './Icons';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface NewFolderModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface NewFolderModalProps {
 }
 
 export const NewFolderModal: React.FC<NewFolderModalProps> = ({ isOpen, onClose, onSubmit }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,11 +28,11 @@ export const NewFolderModal: React.FC<NewFolderModalProps> = ({ isOpen, onClose,
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError('Klasör adı boş bırakılamaz');
+      setError(t('folder.empty_error'));
       return;
     }
     if (trimmed.includes('/') || trimmed.includes('\\')) {
-      setError('Klasör adı / veya \\ içeremez');
+      setError(t('folder.invalid_chars'));
       return;
     }
 
@@ -50,21 +52,21 @@ export const NewFolderModal: React.FC<NewFolderModalProps> = ({ isOpen, onClose,
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Yeni Klasör Oluştur"
+      title={t('folder.create_title')}
       icon={<FolderIcon className="w-5 h-5 text-accent" />}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="folder-name-input" className="block text-xs font-medium text-charcoal-700 mb-1">
-            Klasör Adı
+          <label htmlFor="folder-name-input" className="block text-xs font-semibold text-charcoal-700 mb-1">
+            {t('folder.name_label')}
           </label>
           <input
             id="folder-name-input"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Örn. Projeler"
-            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+            placeholder={t('folder.placeholder')}
+            className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             disabled={loading}
           />
         </div>
@@ -82,14 +84,14 @@ export const NewFolderModal: React.FC<NewFolderModalProps> = ({ isOpen, onClose,
             disabled={loading}
             className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
           >
-            İptal
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
             disabled={loading || !name.trim()}
-            className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-hover text-white rounded-lg shadow-sm transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
           >
-            {loading ? 'Oluşturuluyor...' : 'Oluştur'}
+            {loading ? t('folder.creating') : t('folder.create_button')}
           </button>
         </div>
       </form>

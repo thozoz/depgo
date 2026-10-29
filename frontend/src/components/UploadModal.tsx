@@ -4,6 +4,7 @@ import { formatBytes, joinPath } from '../utils/format';
 import { Modal } from './Modal';
 import { UploadIcon, CheckIcon, SpinnerIcon, CloseIcon } from './Icons';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onClose,
   onCompleted,
 }) => {
+  const { t } = useTranslation();
   const [uploads, setUploads] = useState<FileUploadState[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -68,7 +70,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           );
         },
         controller.signal,
-        overwrite // Explicit overwrite parameter
+        overwrite
       );
 
       setUploads((prev) =>
@@ -83,7 +85,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               ? {
                   ...u,
                   status: 'conflict',
-                  error: 'Bu konumda aynı isimde bir dosya zaten var.',
+                  error: t('upload.conflict_warning'),
                 }
               : u
           )
@@ -99,28 +101,24 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const startUploads = async () => {
+    if (isUploading) return;
     setIsUploading(true);
-    let anySuccess = false;
 
-    for (let i = 0; i < uploads.length; i++) {
-      if (uploads[i].status !== 'pending') continue;
-      const ok = await uploadSingle(i, false);
-      if (ok) anySuccess = true;
-    }
-
-    setIsUploading(false);
-    if (anySuccess) {
+    try {
+      for (let i = 0; i < uploads.length; i++) {
+        if (uploads[i].status === 'pending') {
+          await uploadSingle(i);
+        }
+      }
+    } finally {
+      setIsUploading(false);
       onCompleted();
     }
   };
 
   const handleExplicitOverwrite = async (index: number) => {
-    setIsUploading(true);
-    const ok = await uploadSingle(index, true);
-    setIsUploading(false);
-    if (ok) {
-      onCompleted();
-    }
+    await uploadSingle(index, true);
+    onCompleted();
   };
 
   const removePending = (index: number) => {
@@ -132,18 +130,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   return (
     <Modal
       isOpen={isOpen}
-      onClose={() => {
-        if (!isUploading) onClose();
-      }}
+      onClose={onClose}
       title="Dosya Yükle"
       icon={<UploadIcon className="w-5 h-5 text-accent" />}
-      maxWidthClass="max-w-lg"
+      maxWidthClass="max-w-md"
     >
-      <p className="text-xs text-charcoal-500 mb-3 truncate">
-        Hedef klasör: <span className="font-mono text-charcoal-800">{currentDir}</span>
-      </p>
-
-      {/* Drag & Drop zone */}
+      {/* Drag & drop upload area */}
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -159,7 +151,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
         className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors mb-4 ${
           dragOver
             ? 'border-accent bg-accent/5'
-            : 'border-charcoal-200 hover:border-charcoal-300 bg-warm-50'
+            : 'border-charcoal-300 hover:border-accent hover:bg-warm-50'
         }`}
       >
         <input
@@ -170,13 +162,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           onChange={(e) => handleFilesSelected(e.target.files)}
         />
         <UploadIcon className="w-8 h-8 mx-auto text-charcoal-400 mb-2" />
-        <p className="text-sm font-medium text-charcoal-700">
-          Dosyaları buraya sürükleyin veya <span className="text-accent underline">seçin</span>
+        <p className="text-xs font-semibold text-charcoal-700">
+          {t('upload.dropzone_text')}
         </p>
-        <p className="text-xs text-charcoal-400 mt-1">Birden fazla dosya seçebilirsiniz</p>
+        <p className="text-[11px] text-charcoal-400 mt-1">
+          Hedef: <span className="font-mono text-charcoal-600 font-medium">{currentDir}</span>
+        </p>
       </div>
 
-      {/* Upload list */}
+      {/* Upload queue list */}
       {uploads.length > 0 && (
         <div className="overflow-y-auto space-y-2 mb-4 pr-1 max-h-60 min-h-[100px]">
           {uploads.map((item, idx) => (
@@ -197,7 +191,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                       type="button"
                       onClick={() => removePending(idx)}
                       className="text-charcoal-400 hover:text-red-500"
-                      title="Listeden çıkar"
+                      title={t('upload.remove_from_list')}
                     >
                       <CloseIcon className="w-3.5 h-3.5" />
                     </button>
@@ -223,13 +217,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({
                     disabled={isUploading}
                     className="px-2 py-0.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-medium text-[11px]"
                   >
-                    Üzerine Yaz
+                    {t('upload.overwrite')}
                   </button>
                 </div>
               )}
 
               {item.status === 'error' && (
-                <span className="text-red-600 font-medium">{item.error || 'Hata'}</span>
+                <span className="text-red-600 font-medium">{item.error || t('common.error')}</span>
               )}
             </div>
           ))}
@@ -239,7 +233,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({
       {/* Footer actions */}
       <div className="flex items-center justify-between pt-3 border-t border-charcoal-100">
         <span className="text-xs text-charcoal-500">
-          {uploads.length > 0 ? `${uploads.length} dosya seçildi` : 'Dosya seçilmedi'}
+          {uploads.length > 0
+            ? t('upload.files_selected', { count: uploads.length })
+            : t('upload.no_files_selected')}
         </span>
         <div className="flex space-x-2">
           <button
@@ -248,16 +244,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             disabled={isUploading}
             className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
           >
-            {allFinished ? 'Kapat' : 'İptal'}
+            {allFinished ? 'Kapat' : t('common.cancel')}
           </button>
           {uploads.some((u) => u.status === 'pending') && (
             <button
               type="button"
               onClick={startUploads}
               disabled={isUploading}
-              className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-hover text-white rounded-lg shadow-sm transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
-              {isUploading ? 'Yükleniyor...' : 'Yüklemeyi Başlat'}
+              {isUploading ? t('upload.uploading') : 'Yüklemeyi Başlat'}
             </button>
           )}
         </div>

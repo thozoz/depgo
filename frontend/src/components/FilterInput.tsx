@@ -1,5 +1,6 @@
 import React from 'react';
 import { SearchIcon, CloseIcon } from './Icons';
+import { useTranslation } from '../utils/i18n';
 
 interface FilterInputProps {
   value: string;
@@ -10,8 +11,11 @@ interface FilterInputProps {
 export const FilterInput: React.FC<FilterInputProps> = ({
   value,
   onChange,
-  placeholder = 'Bu klasörde filtrele...',
+  placeholder,
 }) => {
+  const { t } = useTranslation();
+  const inputPlaceholder = placeholder || t('files.filter_placeholder');
+
   return (
     <div className="relative flex items-center w-full min-w-0 sm:max-w-xs">
       <div className="absolute left-3 text-charcoal-400 pointer-events-none">
@@ -21,7 +25,7 @@ export const FilterInput: React.FC<FilterInputProps> = ({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={inputPlaceholder}
         aria-label="Dosyaları filtrele"
         className="w-full pl-9 pr-8 py-1.5 bg-white border border-charcoal-200 rounded-lg text-sm text-charcoal-800 placeholder-charcoal-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
       />

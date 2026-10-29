@@ -505,30 +505,33 @@ export const App: React.FC = () => {
 
                 {/* File list pagination bar (prevent silent truncation) */}
                 {(totalFiles > perPage || hasMore) && !filterQuery && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-white border border-charcoal-200 rounded-xl text-xs text-charcoal-600">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-white border border-charcoal-200 rounded-xl text-xs text-charcoal-600 shadow-xs">
                     <span>
-                      Toplam {totalFiles} öğeden {(page - 1) * perPage + 1} -{' '}
-                      {Math.min(page * perPage, totalFiles)} arası gösteriliyor
+                      {t('files.pagination_summary', {
+                        total: totalFiles,
+                        start: (page - 1) * perPage + 1,
+                        end: Math.min(page * perPage, totalFiles),
+                      })}
                     </span>
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
                         onClick={() => loadFiles(currentDir, page - 1)}
                         disabled={page <= 1 || loading}
-                        className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                        className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40 transition-colors"
                       >
-                        Önceki Sayfa
+                        {t('files.prev_page')}
                       </button>
-                      <span className="font-medium text-charcoal-800">
+                      <span className="font-semibold text-charcoal-800">
                         {page} / {totalPages}
                       </span>
                       <button
                         type="button"
                         onClick={() => loadFiles(currentDir, page + 1)}
                         disabled={(!hasMore && page >= totalPages) || loading}
-                        className="px-2.5 py-1 bg-white border border-charcoal-200 rounded hover:bg-warm-100 disabled:opacity-40"
+                        className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40 transition-colors"
                       >
-                        Sonraki Sayfa
+                        {t('files.next_page')}
                       </button>
                     </div>
                   </div>

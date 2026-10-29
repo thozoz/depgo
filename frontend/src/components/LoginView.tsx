@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { authApi } from '../api/client';
 import { LockIcon, SpinnerIcon } from './Icons';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+  const { t, lang, setLanguage } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,31 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-warm-50 flex flex-col justify-center items-center p-4">
+    <div className="min-h-screen bg-warm-50 flex flex-col justify-center items-center p-4 relative">
+      {/* Top right language switch */}
+      <div className="absolute top-4 right-4 flex items-center rounded-lg border border-charcoal-200 p-0.5 text-xs font-medium bg-white text-charcoal-600 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setLanguage('tr')}
+          className={`px-2 py-1 rounded transition-all ${
+            lang === 'tr' ? 'bg-warm-100 font-semibold text-charcoal-900 shadow-xs' : 'hover:text-charcoal-900'
+          }`}
+          aria-label="Türkçe"
+        >
+          TR
+        </button>
+        <button
+          type="button"
+          onClick={() => setLanguage('en')}
+          className={`px-2 py-1 rounded transition-all ${
+            lang === 'en' ? 'bg-warm-100 font-semibold text-charcoal-900 shadow-xs' : 'hover:text-charcoal-900'
+          }`}
+          aria-label="English"
+        >
+          EN
+        </button>
+      </div>
+
       <div className="max-w-sm w-full bg-white border border-charcoal-200/90 rounded-2xl shadow-xl p-8 space-y-6">
         {/* Brand header */}
         <div className="text-center space-y-2">
@@ -41,7 +67,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             D
           </div>
           <h1 className="text-xl font-bold text-charcoal-900 tracking-tight">Depgo</h1>
-          <p className="text-xs text-charcoal-500">Güvenli Yerel Dosya Yönetimi ve Paylaşım</p>
+          <p className="text-xs text-charcoal-500">{t('app.tagline')}</p>
         </div>
 
         {error && (
@@ -49,7 +75,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             role="alert"
             className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 space-y-1"
           >
-            <div className="font-semibold">Giriş Başarısız</div>
+            <div className="font-semibold">{t('common.error')}</div>
             <div>{error}</div>
           </div>
         )}
@@ -57,7 +83,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="username-input" className="block text-xs font-semibold text-charcoal-700 mb-1.5">
-              Kullanıcı Adı
+              {t('login.username_label')}
             </label>
             <input
               id="username-input"
@@ -74,7 +100,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
           <div>
             <label htmlFor="password-input" className="block text-xs font-semibold text-charcoal-700 mb-1.5">
-              Şifre
+              {t('login.password_label')}
             </label>
             <input
               id="password-input"
@@ -97,20 +123,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             {loading ? (
               <>
                 <SpinnerIcon className="w-4 h-4 animate-spin" />
-                <span>Giriş Yapılıyor...</span>
+                <span>{t('login.submitting')}</span>
               </>
             ) : (
               <>
                 <LockIcon className="w-4 h-4" />
-                <span>Giriş Yap</span>
+                <span>{t('login.submit_button')}</span>
               </>
             )}
           </button>
         </form>
-
-        <div className="pt-2 text-center text-xs text-charcoal-400 border-t border-charcoal-100">
-          <span>Yalnızca yönetici girişi desteklenir.</span>
-        </div>
       </div>
     </div>
   );

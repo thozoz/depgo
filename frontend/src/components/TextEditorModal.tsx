@@ -3,6 +3,7 @@ import { textApi, ApiError } from '../api/client';
 import { formatBytes, getUtf8ByteLength, MAX_TEXT_SIZE_BYTES } from '../utils/format';
 import { CloseIcon, FileTextIcon, SpinnerIcon, AlertTriangleIcon } from './Icons';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface TextEditorModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
   onClose,
   onSaved,
 }) => {
+  const { t } = useTranslation();
   const [content, setContent] = useState('');
   const [initialContent, setInitialContent] = useState('');
   const [revision, setRevision] = useState<number>(0);
@@ -54,7 +56,6 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
     }
   }, [isOpen, loadText]);
 
-  // Handle beforeunload ONLY when dirty
   useEffect(() => {
     if (!isOpen || !isDirty) return;
 
@@ -67,10 +68,9 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isOpen, isDirty]);
 
-  // Handle Escape key
   const handleAttemptClose = () => {
     if (isDirty) {
-      if (!window.confirm('Kaydedilmemiş değişiklikleriniz var. Kapatmak istediğinize emin misiniz?')) {
+      if (!window.confirm(t('editor.unsaved_warning'))) {
         return;
       }
     }
@@ -80,22 +80,17 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        e.preventDefault();
         handleAttemptClose();
       }
     };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isDirty]);
 
-  if (!isOpen) return null;
-
-  const currentByteLength = getUtf8ByteLength(content);
-  const isOverSizeLimit = currentByteLength > MAX_TEXT_SIZE_BYTES;
-
   const handleSave = async () => {
-    if (isOverSizeLimit) {
-      setError(`Metin boyutu 2 MB sınırını aşıyor (${formatBytes(currentByteLength)}).`);
+    const byteLength = getUtf8ByteLength(content);
+    if (byteLength > MAX_TEXT_SIZE_BYTES) {
+      setError(`Metin boyutu 5 MB sınırını aşıyor (${formatBytes(byteLength)}).`);
       return;
     }
 
@@ -103,14 +98,14 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
       setSaving(true);
       setError(null);
       setConflict(null);
-      const res = await textApi.put(filePath, content, revision);
-      setRevision(res.revision);
+      const resp = await textApi.put(filePath, content, revision);
+      setRevision(resp.revision);
       setInitialContent(content);
       onSaved();
     } catch (err: unknown) {
-      if (err instanceof ApiError && (err.status === 409 || err.status === 412 || err.code === 409 || err.code === 412)) {
+      if (err instanceof ApiError && (err.status === 409 || err.code === 409)) {
         setConflict(
-          'Çakışma tespit edildi: Dosya sunucuda başka bir işlem tarafından değiştirilmiş (revizyon uyuşmazlığı). Sunucudaki güncel içeriği yükleyebilirsiniz (kaydedilmemiş değişiklikleriniz kaybolur).'
+          'Çakışma tespit edildi: Dosya siz düzenlerken başka bir işlem veya kullanıcı tarafından değiştirildi. Kaydetmek mevcut sürümün üzerine yazılmasına neden olabilir. Lütfen güncel içeriği tekrar yükleyin.'
         );
       } else {
         setError(describeError(err, 'Kayıt işlemi başarısız'));
@@ -120,93 +115,86 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
     }
   };
 
+  const handleReload = async () => {
+    if (isDirty && !window.confirm('Mevcut düzenlemeleriniz kaybolacak. Devam edilsin mi?')) {
+      return;
+    }
+    await loadText();
+  };
+
+  if (!isOpen) return null;
+
+  const byteLength = getUtf8ByteLength(content);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-charcoal-900/60 backdrop-blur-sm"
     >
-      <div
-        className="fixed inset-0 bg-charcoal-900/60 backdrop-blur-sm transition-opacity"
-        onClick={handleAttemptClose}
-        aria-hidden="true"
-      />
-      <div className="relative bg-white rounded-2xl shadow-2xl border border-charcoal-200 max-w-4xl w-full h-[90vh] z-10 flex flex-col overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl border border-charcoal-200 w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-charcoal-200 bg-warm-100 flex-shrink-0">
-          <div className="flex items-center space-x-2 truncate">
-            <FileTextIcon className="w-5 h-5 text-accent flex-shrink-0" />
-            <span id={titleId} className="font-semibold text-charcoal-900 text-sm truncate" title={fileName}>
+        <div className="px-5 py-3.5 border-b border-charcoal-200 flex items-center justify-between bg-warm-50/70">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <FileTextIcon className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <h2 id={titleId} className="text-sm font-semibold text-charcoal-900 truncate">
               {fileName}
-            </span>
-            <span className="text-xs text-charcoal-500 font-mono">
-              (Rev: {revision})
+            </h2>
+            <span className="font-mono text-xs px-2 py-0.5 rounded bg-charcoal-100 text-charcoal-600">
+              Rev #{revision}
             </span>
             {isDirty && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 font-medium">
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">
                 Değiştirildi
               </span>
             )}
           </div>
-          <div className="flex items-center space-x-2">
-            <span
-              className={`text-xs ${
-                isOverSizeLimit ? 'text-red-600 font-bold' : 'text-charcoal-500'
-              }`}
-            >
-              {formatBytes(currentByteLength)} / 2 MB
-            </span>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={loading || saving || !isDirty || isOverSizeLimit}
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg shadow-sm transition-colors disabled:opacity-40"
-            >
-              {saving ? <SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> : null}
-              <span>{saving ? 'Kaydediliyor...' : 'Kaydet'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleAttemptClose}
-              disabled={saving}
-              className="p-1 text-charcoal-400 hover:text-charcoal-700 rounded-lg transition-colors"
-              aria-label="Kapat"
-            >
-              <CloseIcon className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleAttemptClose}
+            className="p-1.5 text-charcoal-500 hover:text-charcoal-800 rounded-lg hover:bg-charcoal-100 transition-colors"
+            aria-label="Kapat"
+          >
+            <CloseIcon className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Conflict banner */}
+        {/* Conflict / Error alerts */}
         {conflict && (
-          <div className="p-3 bg-yellow-50 border-b border-yellow-200 text-yellow-900 text-xs flex items-center justify-between gap-2 flex-shrink-0">
-            <div className="flex items-center space-x-2">
-              <AlertTriangleIcon className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+          <div className="p-3 bg-yellow-50 border-b border-yellow-200 text-xs text-yellow-900 flex items-start justify-between">
+            <div className="flex items-start space-x-2">
+              <AlertTriangleIcon className="w-4 h-4 text-yellow-700 flex-shrink-0 mt-0.5" />
               <span>{conflict}</span>
             </div>
             <button
               type="button"
-              onClick={loadText}
-              className="px-2.5 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-medium text-xs whitespace-nowrap"
+              onClick={handleReload}
+              className="ml-3 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-medium text-xs flex-shrink-0"
             >
-              Sunucudan Yeniden Yükle
+              Yeniden Yükle
             </button>
           </div>
         )}
 
-        {/* Error banner */}
         {error && (
-          <div className="p-3 bg-red-50 border-b border-red-200 text-red-700 text-xs flex items-center justify-between flex-shrink-0">
+          <div className="p-3 bg-red-50 border-b border-red-200 text-xs text-red-700 flex items-center justify-between">
             <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-red-500 hover:text-red-700 text-xs font-medium"
+            >
+              {t('common.close')}
+            </button>
           </div>
         )}
 
-        {/* Text editor body: plain text ONLY */}
-        <div className="flex-1 p-3 bg-white flex flex-col overflow-hidden">
+        {/* Content Area */}
+        <div className="flex-1 relative bg-charcoal-50/30 overflow-hidden flex flex-col">
           {loading ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-charcoal-500 space-y-2">
-              <SpinnerIcon className="w-7 h-7 text-accent animate-spin" />
+            <div className="flex-1 flex flex-col items-center justify-center text-charcoal-500">
+              <SpinnerIcon className="w-8 h-8 text-accent animate-spin mb-2" />
               <span className="text-sm">Metin yükleniyor...</span>
             </div>
           ) : (
@@ -214,12 +202,51 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
               ref={textareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              disabled={saving}
               aria-label="Metin düzenleyici içeriği"
-              className="w-full h-full p-3 font-mono text-xs sm:text-sm text-charcoal-900 bg-warm-50/50 border border-charcoal-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent selection:bg-accent/20"
-              placeholder="Metin içeriği burada düzenlenir..."
+              className="w-full flex-1 p-4 font-mono text-xs sm:text-sm text-charcoal-900 bg-white resize-none border-0 focus:outline-none focus:ring-0 leading-relaxed overflow-y-auto"
+              placeholder="Dosya içeriği boş..."
+              spellCheck={false}
             />
           )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-charcoal-200 flex items-center justify-between bg-warm-50/70 text-xs text-charcoal-500">
+          <div className="flex items-center space-x-4">
+            <span>
+              Boyut: <span className="font-mono text-charcoal-700">{formatBytes(byteLength)}</span>
+            </span>
+            <span>
+              Satır:{' '}
+              <span className="font-mono text-charcoal-700">{content.split('\n').length}</span>
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              type="button"
+              onClick={handleAttemptClose}
+              disabled={saving}
+              className="px-3 py-1.5 text-xs font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || loading || !isDirty}
+              className="px-4 py-1.5 text-xs font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors flex items-center space-x-1.5 disabled:opacity-40"
+            >
+              {saving ? (
+                <>
+                  <SpinnerIcon className="w-3.5 h-3.5 animate-spin" />
+                  <span>{t('common.saving')}</span>
+                </>
+              ) : (
+                <span>Kaydet</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

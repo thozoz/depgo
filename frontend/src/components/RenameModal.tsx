@@ -3,6 +3,7 @@ import { FileItem } from '../types';
 import { Modal } from './Modal';
 import { EditIcon } from './Icons';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface RenameModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface RenameModalProps {
 }
 
 export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose, onSubmit }) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose,
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError('Ad boş bırakılamaz');
+      setError(t('rename.empty_error'));
       return;
     }
     if (trimmed === item.name) {
@@ -38,7 +40,7 @@ export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose,
       return;
     }
     if (trimmed.includes('/') || trimmed.includes('\\')) {
-      setError('Ad / veya \\ içeremez');
+      setError(t('rename.invalid_chars'));
       return;
     }
 
@@ -63,15 +65,15 @@ export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose,
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="rename-input" className="block text-xs font-medium text-charcoal-700 mb-1">
-            Yeni Ad
+          <label htmlFor="rename-input" className="block text-xs font-semibold text-charcoal-700 mb-1">
+            {t('rename.name_label')}
           </label>
           <input
             id="rename-input"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+            className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             disabled={loading}
           />
         </div>
@@ -89,14 +91,14 @@ export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose,
             disabled={loading}
             className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
           >
-            İptal
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
             disabled={loading || !name.trim()}
-            className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-hover text-white rounded-lg shadow-sm transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
           >
-            {loading ? 'Kaydediliyor...' : 'Kaydet'}
+            {loading ? t('common.saving') : t('rename.save_button')}
           </button>
         </div>
       </form>

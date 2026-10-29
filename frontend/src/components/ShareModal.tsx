@@ -5,6 +5,7 @@ import { Modal } from './Modal';
 import { ShareIcon, CopyIcon, CheckIcon } from './Icons';
 import { copyText } from '../utils/clipboard';
 import { describeShareError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -50,7 +52,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         setBurnAfterRead(existingShare.burn_after_read);
       } else if (item) {
         setCreatedShare(null);
-        // Default slug from name
         const autoSlug = item.name
           .toLowerCase()
           .replace(/[^a-z0-9_-]/g, '-')
@@ -102,7 +103,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           expire_hours: expireHours > 0 ? expireHours : undefined,
           allow_preview: allowPreview,
           allow_download: allowDownload,
-          burn_after_read: burnAfterRead || undefined,
+          burn_after_read: burnAfterRead,
         });
       }
 
@@ -115,54 +116,91 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     }
   };
 
-  const getShareUrl = (s: ShareResp) => {
-    return `${window.location.origin}/s/${s.share_id}`;
-  };
-
-  const copyToClipboard = async (text: string) => {
-    await copyText(text);
+  const handleCopyLink = async () => {
+    if (!createdShare) return;
+    const shareUrl = `${window.location.origin}/s/${createdShare.share_id}`;
+    await copyText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const shareUrl = createdShare ? `${window.location.origin}/s/${createdShare.share_id}` : '';
+
+  // Success view (when created or updated)
+  if (createdShare && !existingShare) {
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={t('share.ready_title')}
+        icon={<CheckIcon className="w-5 h-5 text-accent" />}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-charcoal-600">
+            Aşağıdaki bağlantıyı kopyalayarak paylaşabilirsiniz.
+          </p>
+
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              readOnly
+              value={shareUrl}
+              className="flex-1 px-3 py-2 bg-warm-50 border border-charcoal-200 rounded-lg text-xs font-mono text-charcoal-800 select-all"
+            />
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded-lg shadow-xs transition-colors flex-shrink-0"
+            >
+              {copied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+              <span>{copied ? t('common.copied') : t('common.copy')}</span>
+            </button>
+          </div>
+
+          <div className="p-3 bg-warm-100 rounded-lg text-xs text-charcoal-600 space-y-1">
+            <div className="flex justify-between">
+              <span>Bağlantı:</span>
+              <span className="font-mono text-charcoal-800 font-semibold">{createdShare.share_id}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Güvenlik:</span>
+              <span className="font-semibold text-charcoal-800">
+                {createdShare.has_password ? 'Parolalı' : 'Açık Paylaşım'}
+              </span>
+            </div>
+            {createdShare.burn_after_read && (
+              <div className="flex justify-between text-yellow-700">
+                <span>Mod:</span>
+                <span className="font-semibold">Tek Okumalık</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors"
+            >
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={existingShare ? 'Paylaşım Bağlantısını Düzenle' : 'Paylaşım Bağlantısı Oluştur'}
+      title={existingShare ? 'Paylaşımı Düzenle' : 'Paylaşım Bağlantısı Oluştur'}
       icon={<ShareIcon className="w-5 h-5 text-accent" />}
-      maxWidthClass="max-w-lg"
+      maxWidthClass="max-w-md"
     >
-      {createdShare && (
-        <div className="p-4 bg-accent/10 border border-accent/20 rounded-xl mb-5 space-y-2">
-          <span className="text-xs font-semibold text-accent-dark uppercase tracking-wide">
-            Paylaşım Bağlantınız Hazır
-          </span>
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              readOnly
-              value={getShareUrl(createdShare)}
-              className="w-full text-xs font-mono bg-white border border-charcoal-200 rounded-lg px-2.5 py-1.5 select-all"
-            />
-            <button
-              type="button"
-              onClick={() => copyToClipboard(getShareUrl(createdShare))}
-              className="flex items-center space-x-1 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg shadow-sm transition-colors flex-shrink-0"
-            >
-              {copied ? <CheckIcon className="w-3.5 h-3.5" /> : <CopyIcon className="w-3.5 h-3.5" />}
-              <span>{copied ? 'Kopyalandı' : 'Kopyala'}</span>
-            </button>
-          </div>
-          <p className="text-[11px] text-charcoal-500">
-            Bu bağlantıyı alan kullanıcılar hesaba giriş yapmadan dosyayı görüntüleyebilir veya indirebilir.
-          </p>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="share-name-input" className="block text-xs font-medium text-charcoal-700 mb-1">
+          <label htmlFor="share-name-input" className="block text-xs font-semibold text-charcoal-700 mb-1">
             Paylaşım Başlığı
           </label>
           <input
@@ -170,38 +208,35 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Örn. Paylaşılan Dosya"
-            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
+            placeholder="Başlık girin"
+            className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             disabled={loading}
           />
         </div>
 
         <div>
-          <label htmlFor="share-slug-input" className="block text-xs font-medium text-charcoal-700 mb-1">
-            Özel Bağlantı Adı (Slug)
+          <label htmlFor="share-slug-input" className="block text-xs font-semibold text-charcoal-700 mb-1">
+            {t('share.slug_label')}
           </label>
-          <div className="flex items-stretch">
-            <span className="flex items-center whitespace-nowrap text-xs text-charcoal-400 bg-charcoal-100 border border-r-0 border-charcoal-200 px-2.5 py-2 rounded-l-lg select-none">
+          <div className="flex items-center">
+            <span className="px-2.5 py-2 bg-warm-100 border border-r-0 border-charcoal-300 rounded-l-lg text-xs font-mono text-charcoal-500 select-none">
               /s/
             </span>
             <input
               id="share-slug-input"
               type="text"
               value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              placeholder="ozel-ad (isteğe bağlı)"
-              className="w-full px-3 py-2 border border-charcoal-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent font-mono text-xs"
+              onChange={(e) => setSlug(e.target.value.toLowerCase())}
+              placeholder="ornek-dosya"
+              className="flex-1 px-3 py-2 border border-charcoal-300 rounded-r-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
               disabled={loading}
             />
           </div>
-          <span className="text-[11px] text-charcoal-400 mt-1 block">
-            Harf, rakam, tire veya alt çizgi (1-32 karakter). Boş bırakılırsa otomatik üretilir.
-          </span>
         </div>
 
         <div>
-          <label htmlFor="share-password-input" className="block text-xs font-medium text-charcoal-700 mb-1">
-            Erişim Parolası (İsteğe bağlı)
+          <label htmlFor="share-password-input" className="block text-xs font-semibold text-charcoal-700 mb-1">
+            {t('share.password_label')}
           </label>
           <input
             id="share-password-input"
@@ -213,7 +248,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 ? 'Yeni parola girin (mevcut parolayı korumak için boş bırakın)'
                 : 'Parola belirleyin'
             }
-            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-charcoal-50 disabled:text-charcoal-400"
+            className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-charcoal-50 disabled:text-charcoal-400"
             disabled={loading || removePassword}
           />
           {existingShare?.has_password && (
@@ -235,14 +270,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({
 
         {!existingShare && (
           <div>
-            <label htmlFor="share-expire-select" className="block text-xs font-medium text-charcoal-700 mb-1">
+            <label htmlFor="share-expire-select" className="block text-xs font-semibold text-charcoal-700 mb-1">
               Son Kullanma Süresi
             </label>
             <select
               id="share-expire-select"
               value={expireHours}
               onChange={(e) => setExpireHours(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-white"
+              className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-white"
               disabled={loading}
             >
               <option value={0}>Süresiz</option>
@@ -285,9 +320,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               className="mt-0.5 rounded text-accent focus:ring-accent"
             />
             <span>
-              Okunduktan sonra bu paylaşımı sil
-              <span className="block text-charcoal-500">
-                Bağlantı bir kez açılıp içeriği alınınca paylaşım silinir. Dosyanın kendisi silinmez.
+              {t('share.burn_after_read')}
+              <span className="block text-charcoal-500 font-normal">
+                {t('share.burn_description')}
               </span>
             </span>
           </label>
@@ -306,14 +341,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             disabled={loading}
             className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
           >
-            Kapat
+            {t('common.close')}
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-hover text-white rounded-lg shadow-sm transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
           >
-            {loading ? 'Kaydediliyor...' : existingShare ? 'Güncelle' : 'Paylaşım Oluştur'}
+            {loading ? t('common.saving') : existingShare ? 'Güncelle' : 'Paylaşım Oluştur'}
           </button>
         </div>
       </form>
