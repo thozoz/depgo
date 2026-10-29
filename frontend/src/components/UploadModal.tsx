@@ -3,6 +3,7 @@ import { fsApi, ApiError } from '../api/client';
 import { formatBytes, joinPath } from '../utils/format';
 import { Modal } from './Modal';
 import { UploadIcon, CheckIcon, SpinnerIcon, CloseIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -88,7 +89,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           )
         );
       } else {
-        const errorMsg = err instanceof Error ? err.message : 'Yükleme başarısız';
+        const errorMsg = describeError(err, 'Yükleme başarısız');
         setUploads((prev) =>
           prev.map((u, idx) => (idx === index ? { ...u, status: 'error', error: errorMsg } : u))
         );

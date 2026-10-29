@@ -52,6 +52,16 @@ func bindPublicShareReq(c *gin.Context, req any) bool {
 	return true
 }
 
+// writeShareLookupError answers a failed share lookup without leaking the
+// database error: a missing share is a plain 404, anything else is a 500.
+func writeShareLookupError(c *gin.Context, err error) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		common.ErrorStrResp(c, "share not found", 404)
+		return
+	}
+	common.ErrorResp(c, err, 500, true)
+}
+
 // writeShareClaimError answers a failed attempt to claim an access slot.
 //
 // Not found means the row vanished between the availability check and the claim:
@@ -76,7 +86,7 @@ func GetPublicShareInfo(c *gin.Context) {
 	}
 	share, err := db.GetShareByShareID(shareID)
 	if err != nil {
-		common.ErrorResp(c, err, 404)
+		writeShareLookupError(c, err)
 		return
 	}
 	if !ensureShareAvailable(c, share) {
@@ -178,7 +188,7 @@ func ListPublicShare(c *gin.Context) {
 	req.Page, req.PerPage = normalizeListPage(req.Page, req.PerPage)
 	share, err := db.GetShareByShareID(req.ShareID)
 	if err != nil {
-		common.ErrorResp(c, err, 404)
+		writeShareLookupError(c, err)
 		return
 	}
 	if !ensureShareAvailable(c, share) {
@@ -239,7 +249,7 @@ func GetPublicShare(c *gin.Context) {
 	}
 	share, err := db.GetShareByShareID(req.ShareID)
 	if err != nil {
-		common.ErrorResp(c, err, 404)
+		writeShareLookupError(c, err)
 		return
 	}
 	if !ensureShareAvailable(c, share) {
@@ -273,7 +283,7 @@ func GetPublicShare(c *gin.Context) {
 func ShareDown(c *gin.Context) {
 	share, err := db.GetShareByShareID(c.Param("share_id"))
 	if err != nil {
-		common.ErrorResp(c, err, 404)
+		writeShareLookupError(c, err)
 		return
 	}
 	if !ensureShareAvailable(c, share) {
@@ -315,7 +325,7 @@ func ShareDown(c *gin.Context) {
 func ShareProxy(c *gin.Context) {
 	share, err := db.GetShareByShareID(c.Param("share_id"))
 	if err != nil {
-		common.ErrorResp(c, err, 404)
+		writeShareLookupError(c, err)
 		return
 	}
 	if !ensureShareAvailable(c, share) {

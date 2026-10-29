@@ -16,6 +16,7 @@ import {
   SpinnerIcon,
 } from './Icons';
 import { ShareModal } from './ShareModal';
+import { describeShareError } from '../utils/errors';
 
 export const ShareManagement: React.FC = () => {
   const [shares, setShares] = useState<ShareResp[]>([]);
@@ -37,7 +38,7 @@ export const ShareManagement: React.FC = () => {
       setTotal(resp.total || 0);
       setPage(targetPage);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Paylaşımlar yüklenemedi');
+      setError(describeShareError(err, 'Paylaşımlar yüklenemedi'));
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,7 @@ export const ShareManagement: React.FC = () => {
       await shareApi.disable(share.share_id);
       fetchShares(page);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Paylaşım kapatılamadı');
+      alert(describeShareError(err, 'Paylaşım kapatılamadı'));
     }
   };
 
@@ -76,7 +77,7 @@ export const ShareManagement: React.FC = () => {
       await shareApi.enable(share.share_id);
       fetchShares(page);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Paylaşım etkinleştirilemedi');
+      alert(describeShareError(err, 'Paylaşım etkinleştirilemedi'));
     }
   };
 
@@ -88,7 +89,7 @@ export const ShareManagement: React.FC = () => {
       await shareApi.delete(shareId);
       fetchShares(page);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Paylaşım silinemedi');
+      alert(describeShareError(err, 'Paylaşım silinemedi'));
     }
   };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileItem } from '../types';
 import { Modal } from './Modal';
 import { EditIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface RenameModalProps {
   isOpen: boolean;
@@ -47,7 +48,7 @@ export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose,
       await onSubmit(item, trimmed);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Yeniden adlandırılamadı');
+      setError(describeError(err, 'Yeniden adlandırılamadı'));
     } finally {
       setLoading(false);
     }

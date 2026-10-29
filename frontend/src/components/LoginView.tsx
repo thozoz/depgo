@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { authApi } from '../api/client';
 import { LockIcon, SpinnerIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
@@ -25,7 +26,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       await authApi.login(username.trim(), password);
       onLoginSuccess();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Giriş yapılamadı. Bilgilerinizi kontrol edin.');
+      setError(describeError(err, 'Giriş yapılamadı. Bilgilerinizi kontrol edin.'));
     } finally {
       setLoading(false);
     }

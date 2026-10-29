@@ -303,6 +303,11 @@ test.describe.serial('Depgo real browser lifecycle', () => {
 
       // The preview was the read: the share is gone, the file is not.
       expect((await (await guest.request.get(`/api/public/share/info?share_id=${slug}`)).json()).code).toBe(404);
+      // A visitor who opens the used-up link reads plain Turkish, not a database error.
+      await guestPage.reload();
+      await expect(guestPage.getByText('Bu paylaşım bulunamadı', { exact: false })).toBeVisible();
+      await expect(guestPage.getByText('record not found')).toHaveCount(0);
+      await screenshot(guestPage, 'guest-burnt');
       const listed = await call('/api/share/list?page=1&per_page=100', undefined, 'GET');
       expect(JSON.stringify(listed)).not.toContain(`"share_id":"${slug}"`);
     } finally {

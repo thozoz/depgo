@@ -3,6 +3,7 @@ import { FileItem } from '../types';
 import { Modal } from './Modal';
 import { MoveIcon } from './Icons';
 import { joinPath } from '../utils/format';
+import { describeError } from '../utils/errors';
 
 interface MoveModalProps {
   isOpen: boolean;
@@ -48,7 +49,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
       await onSubmit(item, normalizedTarget);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Taşıma işlemi başarısız');
+      setError(describeError(err, 'Taşıma işlemi başarısız'));
     } finally {
       setLoading(false);
     }

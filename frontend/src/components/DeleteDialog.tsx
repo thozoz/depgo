@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FileItem } from '../types';
 import { Modal } from './Modal';
 import { TrashIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface DeleteDialogProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export const DeleteDialog: React.FC<DeleteDialogProps> = ({
       await onConfirm(item);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Silme işlemi başarısız');
+      setError(describeError(err, 'Silme işlemi başarısız'));
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,7 @@ import { shareApi } from '../api/client';
 import { Modal } from './Modal';
 import { ShareIcon, CopyIcon, CheckIcon } from './Icons';
 import { copyText } from '../utils/clipboard';
+import { describeShareError } from '../utils/errors';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -108,7 +109,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       setCreatedShare(result);
       if (onSuccess) onSuccess();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Paylaşım işlemi başarısız');
+      setError(describeShareError(err, 'Paylaşım işlemi başarısız'));
     } finally {
       setLoading(false);
     }

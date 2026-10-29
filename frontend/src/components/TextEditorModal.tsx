@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { textApi, ApiError } from '../api/client';
 import { formatBytes, getUtf8ByteLength, MAX_TEXT_SIZE_BYTES } from '../utils/format';
 import { CloseIcon, FileTextIcon, SpinnerIcon, AlertTriangleIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface TextEditorModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
       setInitialContent(data.content);
       setRevision(data.revision);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Metin içeriği yüklenemedi');
+      setError(describeError(err, 'Metin içeriği yüklenemedi'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +113,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
           'Çakışma tespit edildi: Dosya sunucuda başka bir işlem tarafından değiştirilmiş (revizyon uyuşmazlığı). Sunucudaki güncel içeriği yükleyebilirsiniz (kaydedilmemiş değişiklikleriniz kaybolur).'
         );
       } else {
-        setError(err instanceof Error ? err.message : 'Kayıt işlemi başarısız');
+        setError(describeError(err, 'Kayıt işlemi başarısız'));
       }
     } finally {
       setSaving(false);

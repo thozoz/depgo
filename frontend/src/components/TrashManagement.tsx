@@ -12,6 +12,7 @@ import {
   SpinnerIcon,
   AlertTriangleIcon,
 } from './Icons';
+import { describeError } from '../utils/errors';
 
 export const TrashManagement: React.FC = () => {
   const [items, setItems] = useState<TrashItem[]>([]);
@@ -39,7 +40,7 @@ export const TrashManagement: React.FC = () => {
         setTotal(data.total || 0);
         setPage(targetPage);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Çöp kutusu listesi alınamadı');
+        setError(describeError(err, 'Çöp kutusu listesi alınamadı'));
       } finally {
         setLoading(false);
       }
@@ -67,7 +68,7 @@ export const TrashManagement: React.FC = () => {
         setCustomTargetPath(item.original_path + '.restored');
         setCollisionError('Orijinal konumda aynı isimde bir dosya veya klasör mevcut. Lütfen alternatif bir geri yükleme yolu girin.');
       } else {
-        alert(err instanceof Error ? err.message : 'Geri yükleme başarısız');
+        alert(describeError(err, 'Geri yükleme başarısız'));
       }
     } finally {
       setActionLoadingId(null);
@@ -83,7 +84,7 @@ export const TrashManagement: React.FC = () => {
       setDeleteConfirmItem(null);
       await fetchTrash(page);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Kalıcı silme işlemi başarısız');
+      alert(describeError(err, 'Kalıcı silme işlemi başarısız'));
     } finally {
       setActionLoadingId(null);
     }

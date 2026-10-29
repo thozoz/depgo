@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { fsApi, ApiError } from '../api/client';
 import { formatBytes, isInlineRasterImage, isPdf, isSvgOrHtml, MAX_PREVIEW_SIZE_BYTES } from '../utils/format';
 import { CloseIcon, DownloadIcon, SpinnerIcon, EyeIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface PreviewModalProps {
   isOpen: boolean;
@@ -91,7 +92,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         if (err instanceof ApiError) {
           setError(err.message);
         } else {
-          setError(err instanceof Error ? err.message : 'Önizleme yüklenemedi');
+          setError(describeError(err, 'Önizleme yüklenemedi'));
         }
         setLoading(false);
       });

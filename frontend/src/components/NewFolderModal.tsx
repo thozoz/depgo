@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { FolderIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface NewFolderModalProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export const NewFolderModal: React.FC<NewFolderModalProps> = ({ isOpen, onClose,
       await onSubmit(trimmed);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Klasör oluşturulamadı');
+      setError(describeError(err, 'Klasör oluşturulamadı'));
     } finally {
       setLoading(false);
     }

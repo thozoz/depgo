@@ -22,6 +22,7 @@ import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { GuestShareView } from './components/GuestShareView';
 import { LoginView } from './components/LoginView';
 import { RefreshIcon, SpinnerIcon } from './components/Icons';
+import { describeError } from './utils/errors';
 
 export const App: React.FC = () => {
   // Check if current URL is a guest share (/s/:share_id)
@@ -106,7 +107,7 @@ export const App: React.FC = () => {
         setPage(targetPage);
         setCurrentDir(path);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Dosyalar yüklenemedi');
+        setError(describeError(err, 'Dosyalar yüklenemedi'));
       } finally {
         setLoading(false);
       }
@@ -150,7 +151,7 @@ export const App: React.FC = () => {
         rawUrl: fileData.raw_url,
       });
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Önizleme bağlantısı alınamadı');
+      alert(describeError(err, 'Önizleme bağlantısı alınamadı'));
     }
   };
 
@@ -178,7 +179,7 @@ export const App: React.FC = () => {
         window.open(fileData.raw_url, '_blank');
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'İndirme bağlantısı alınamadı');
+      alert(describeError(err, 'İndirme bağlantısı alınamadı'));
     }
   };
 

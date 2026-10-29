@@ -14,6 +14,7 @@ import {
   SpinnerIcon,
 } from './Icons';
 import { PreviewModal } from './PreviewModal';
+import { describeError, describeShareError } from '../utils/errors';
 
 interface GuestShareViewProps {
   shareId: string;
@@ -63,7 +64,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
         setTotalItems(1);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Paylaşım bilgisi alınamadı');
+      setError(describeShareError(err, 'Paylaşım bilgisi alınamadı'));
     } finally {
       setLoading(false);
     }
@@ -79,7 +80,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
       setPage(targetPage);
       setCurrentPath(path);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Klasör içeriği yüklenemedi');
+      setError(describeShareError(err, 'Klasör içeriği yüklenemedi'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +113,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
         setTotalItems(1);
       }
     } catch (err: unknown) {
-      setAuthError(err instanceof Error ? err.message : 'Parola hatalı');
+      setAuthError(describeError(err, 'Parola hatalı'));
     } finally {
       setAuthLoading(false);
     }

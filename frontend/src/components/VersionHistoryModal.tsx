@@ -4,6 +4,7 @@ import { versionApi, ApiError } from '../api/client';
 import { formatBytes, formatDate } from '../utils/format';
 import { Modal } from './Modal';
 import { HistoryIcon, RestoreIcon, SpinnerIcon, RefreshIcon, AlertTriangleIcon } from './Icons';
+import { describeError } from '../utils/errors';
 
 interface VersionHistoryModalProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
         setTotal(data.total || 0);
         setPage(targetPage);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Sürüm geçmişi alınamadı');
+        setError(describeError(err, 'Sürüm geçmişi alınamadı'));
       } finally {
         setLoading(false);
       }
@@ -79,7 +80,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
           'Sürüm çakışması (409/412): Dosya başka bir işlem tarafından değiştirilmiş. Lütfen güncel sürüm listesini yenileyip tekrar deneyin.'
         );
       } else {
-        setError(err instanceof Error ? err.message : 'Sürüme geri dönülemedi');
+        setError(describeError(err, 'Sürüme geri dönülemedi'));
       }
     } finally {
       setRestoringId(null);
