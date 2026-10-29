@@ -116,88 +116,54 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     }
   };
 
-  const handleCopyLink = async () => {
-    if (!createdShare) return;
-    const shareUrl = `${window.location.origin}/s/${createdShare.share_id}`;
-    await copyText(shareUrl);
+  const copyToClipboard = async (text: string) => {
+    await copyText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const shareUrl = createdShare ? `${window.location.origin}/s/${createdShare.share_id}` : '';
-
-  // Success view (when created or updated)
-  if (createdShare && !existingShare) {
-    return (
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        title={t('share.ready_title')}
-        icon={<CheckIcon className="w-5 h-5 text-accent" />}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-charcoal-600">
-            Aşağıdaki bağlantıyı kopyalayarak paylaşabilirsiniz.
-          </p>
-
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              readOnly
-              value={shareUrl}
-              className="flex-1 px-3 py-2 bg-warm-50 border border-charcoal-200 rounded-lg text-xs font-mono text-charcoal-800 select-all"
-            />
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="flex items-center space-x-1.5 px-3 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded-lg shadow-xs transition-colors flex-shrink-0"
-            >
-              {copied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
-              <span>{copied ? t('common.copied') : t('common.copy')}</span>
-            </button>
-          </div>
-
-          <div className="p-3 bg-warm-100 rounded-lg text-xs text-charcoal-600 space-y-1">
-            <div className="flex justify-between">
-              <span>Bağlantı:</span>
-              <span className="font-mono text-charcoal-800 font-semibold">{createdShare.share_id}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Güvenlik:</span>
-              <span className="font-semibold text-charcoal-800">
-                {createdShare.has_password ? 'Parolalı' : 'Açık Paylaşım'}
-              </span>
-            </div>
-            {createdShare.burn_after_read && (
-              <div className="flex justify-between text-yellow-700">
-                <span>Mod:</span>
-                <span className="font-semibold">Tek Okumalık</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors"
-            >
-              {t('common.close')}
-            </button>
-          </div>
-        </div>
-      </Modal>
-    );
-  }
+  const getShareUrl = (s: ShareResp) => {
+    return `${window.location.origin}/s/${s.share_id}`;
+  };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={existingShare ? 'Paylaşımı Düzenle' : 'Paylaşım Bağlantısı Oluştur'}
+      title={existingShare ? 'Paylaşım Bağlantısını Düzenle' : 'Paylaşım Bağlantısı Oluştur'}
       icon={<ShareIcon className="w-5 h-5 text-accent" />}
-      maxWidthClass="max-w-md"
+      maxWidthClass="max-w-lg"
     >
+      {/* Ready Box */}
+      {createdShare && (
+        <div className="p-4 bg-accent/10 border border-accent/20 rounded-xl mb-5 space-y-2">
+          <span className="text-xs font-semibold text-accent-dark uppercase tracking-wide">
+            Paylaşım Bağlantınız Hazır
+          </span>
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              readOnly
+              value={getShareUrl(createdShare)}
+              className="w-full text-xs font-mono bg-white border border-charcoal-200 rounded-lg px-2.5 py-1.5 select-all"
+            />
+            <button
+              type="button"
+              onClick={() => copyToClipboard(getShareUrl(createdShare))}
+              className="flex items-center space-x-1 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded-lg shadow-xs transition-colors flex-shrink-0"
+            >
+              {copied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+              <span>{copied ? t('common.copied') : t('common.copy')}</span>
+            </button>
+          </div>
+          {createdShare.burn_after_read && (
+            <p className="text-[11px] text-yellow-700">
+              Bu bağlantı tek okumalık: bir kez kullanıldıktan sonra otomatik olarak silinecektir.
+            </p>
+          )}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="share-name-input" className="block text-xs font-semibold text-charcoal-700 mb-1">
