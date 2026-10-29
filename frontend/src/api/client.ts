@@ -480,11 +480,13 @@ export const publicShareApi = {
     const token = getShareToken(shareId);
     const headers: Record<string, string> = {};
     if (token) {
+      // The header keeps the token out of the URL, and therefore out of browser
+      // history, the Referer header and proxy access logs. Only media elements,
+      // which cannot set headers, still fall back to the ?auth= form.
       headers['X-Share-Token'] = token;
     }
-    const authQuery = token ? `&auth=${encodeURIComponent(token)}` : '';
     return request<PublicShareInfoResp>(
-      `/api/public/share/info?share_id=${encodeURIComponent(shareId)}${authQuery}`,
+      `/api/public/share/info?share_id=${encodeURIComponent(shareId)}`,
       {
         method: 'GET',
         headers,
