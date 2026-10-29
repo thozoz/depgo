@@ -46,14 +46,17 @@ type CreateShareReq struct {
 }
 
 type UpdateShareReq struct {
-	ShareID       string  `json:"share_id" binding:"required"`
-	NewShareID    string  `json:"new_share_id"`
-	Name          string  `json:"name"`
-	Password      string  `json:"password"`
-	ExpireAt      *string `json:"expire_at"`
-	AccessLimit   *int64  `json:"access_limit"`
-	AllowPreview  *bool   `json:"allow_preview"`
-	AllowDownload *bool   `json:"allow_download"`
+	ShareID    string `json:"share_id" binding:"required"`
+	NewShareID string `json:"new_share_id"`
+	Name       string `json:"name"`
+	Password   string `json:"password"`
+	// RemovePassword drops password protection. An empty Password means "keep the
+	// current one", so removal needs its own explicit flag.
+	RemovePassword *bool   `json:"remove_password"`
+	ExpireAt       *string `json:"expire_at"`
+	AccessLimit    *int64  `json:"access_limit"`
+	AllowPreview   *bool   `json:"allow_preview"`
+	AllowDownload  *bool   `json:"allow_download"`
 }
 
 type ShareDeleteReq struct {
@@ -602,6 +605,9 @@ func UpdateShare(c *gin.Context) {
 	if req.Password != "" {
 		share.PasswordSalt = random.String(16)
 		share.PasswordHash = sharePasswordHash(req.Password, share.PasswordSalt)
+	} else if req.RemovePassword != nil && *req.RemovePassword {
+		share.PasswordSalt = ""
+		share.PasswordHash = ""
 	}
 	if share.Enabled && accessLimit > 0 && share.AccessCount >= accessLimit {
 		now := time.Now()

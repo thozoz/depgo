@@ -94,6 +94,7 @@ export interface UpdateShareReq {
   new_share_id?: string;
   name?: string;
   password?: string;
+  remove_password?: boolean;
   expire_at?: string | null;
   access_limit?: number;
   allow_preview?: boolean;

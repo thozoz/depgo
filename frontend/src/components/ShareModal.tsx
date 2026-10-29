@@ -23,6 +23,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [removePassword, setRemovePassword] = useState(false);
   const [expireHours, setExpireHours] = useState<number>(0);
   const [allowPreview, setAllowPreview] = useState(true);
   const [allowDownload, setAllowDownload] = useState(true);
@@ -36,6 +37,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       setError(null);
       setCopied(false);
       setLoading(false);
+      setRemovePassword(false);
       if (existingShare) {
         setCreatedShare(existingShare);
         setSlug(existingShare.share_id);
@@ -80,7 +82,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           share_id: existingShare.share_id,
           new_share_id: slug || undefined,
           name: name.trim() || undefined,
-          password: password || undefined,
+          password: removePassword ? undefined : password || undefined,
+          remove_password: removePassword || undefined,
           allow_preview: allowPreview,
           allow_download: allowDownload,
         });
@@ -204,9 +207,24 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 ? 'Yeni parola girin (mevcut parolayı korumak için boş bırakın)'
                 : 'Parola belirleyin'
             }
-            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
-            disabled={loading}
+            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-charcoal-50 disabled:text-charcoal-400"
+            disabled={loading || removePassword}
           />
+          {existingShare?.has_password && (
+            <label className="mt-2 flex items-center space-x-2 text-xs text-charcoal-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={removePassword}
+                onChange={(e) => {
+                  setRemovePassword(e.target.checked);
+                  if (e.target.checked) setPassword('');
+                }}
+                disabled={loading}
+                className="rounded border-charcoal-300 text-accent focus:ring-accent/30"
+              />
+              <span>Parolayı kaldır (bağlantıyı bilen herkes açabilir)</span>
+            </label>
+          )}
         </div>
 
         {!existingShare && (
