@@ -106,6 +106,19 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request, name string, modTime time
 		return nil
 	}
 
+	// Bound the number of ranges a single request may ask for.
+	//
+	// Each range costs a multipart part with its own headers, while the request
+	// side is just a few bytes: "bytes=0-0,0-0,..." spends 4 bytes per part and
+	// yields ~140 bytes of response, so an uncapped list is an amplification
+	// vector (measured: a 4 KB header produced a 140 KB response for a 1 KB file,
+	// and a 1 MB header - Go's default limit - would produce tens of megabytes)
+	// and a cheap way to burn CPU. Serving the whole file instead of honouring an
+	// absurd range list is what RFC 7233 permits a server to do.
+	if len(ranges) > maxRangesPerRequest {
+		ranges = nil
+	}
+
 	if sumRangesSize(ranges) > size {
 		// The total number of bytes in all the ranges is larger than the size of the file
 		// or unknown file size, ignore the range request.
@@ -211,11 +224,37 @@ func ServeHTTP(w http.ResponseWriter, r *http.Request, name string, modTime time
 	}
 	return nil
 }
+
+// alwaysStripProxyHeaders lists headers that must never be forwarded to the
+// upstream storage provider, regardless of configuration.
+//
+// The proxy relays the caller's request headers to a third party. The depgo
+// session lives in Authorization, so an empty or misconfigured
+// proxy_ignore_headers list would hand the operator's session token, cookies and
+// internal Referer to the upstream host. Configuration is a convenience here,
+// not the guarantee: this list is applied unconditionally and settings can only
+// add to it.
+var alwaysStripProxyHeaders = map[string]struct{}{
+	"authorization":       {},
+	"proxy-authorization": {},
+	"cookie":              {},
+	"cookie2":             {},
+	"referer":             {},
+	"x-share-token":       {},
+	"x-api-key":           {},
+	"x-csrf-token":        {},
+}
+
 func ProcessHeader(origin, override http.Header) http.Header {
 	result := http.Header{}
+	ignore := conf.GetSlice(conf.ProxyIgnoreHeaders)
 	// client header
 	for h, val := range origin {
-		if utils.SliceContains(conf.SlicesMap[conf.ProxyIgnoreHeaders], strings.ToLower(h)) {
+		lower := strings.ToLower(h)
+		if _, blocked := alwaysStripProxyHeaders[lower]; blocked {
+			continue
+		}
+		if utils.SliceContains(ignore, lower) {
 			continue
 		}
 		result[h] = val

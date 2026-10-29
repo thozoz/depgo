@@ -270,6 +270,11 @@ func checkPreconditions(w http.ResponseWriter, r *http.Request, modtime time.Tim
 	return false, rangeHeader
 }
 
+// maxRangesPerRequest caps how many byte ranges one request may specify. A client
+// that needs more than this is not doing media seeking; it is asking the server to
+// build an enormous multipart response out of a tiny request.
+const maxRangesPerRequest = 64
+
 func sumRangesSize(ranges []http_range.Range) (size int64) {
 	for _, ra := range ranges {
 		size += ra.Length
