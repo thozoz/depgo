@@ -107,6 +107,7 @@ export const App: React.FC = () => {
 
   // Drag and drop state
   const [draggedItems, setDraggedItems] = useState<FileItem[]>([]);
+  const draggedItemsRef = useRef<FileItem[]>([]);
   const [dragOverItemName, setDragOverItemName] = useState<string | null>(null);
   const [dragOverCrumbPath, setDragOverCrumbPath] = useState<string | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
@@ -125,7 +126,7 @@ export const App: React.FC = () => {
         setCurrentDir(path);
         setSelectedNames(new Set());
       } catch (err: unknown) {
-        setError(describeError(err, 'Dosyalar yüklenemedi'));
+        setError(describeError(err, t('files.load_failed')));
       } finally {
         setLoading(false);
       }
@@ -169,7 +170,7 @@ export const App: React.FC = () => {
         rawUrl: fileData.raw_url,
       });
     } catch (err: unknown) {
-      alert(describeError(err, 'Önizleme bağlantısı alınamadı'));
+      alert(describeError(err, t('preview.url_fetch_failed')));
     }
   };
 
@@ -197,7 +198,7 @@ export const App: React.FC = () => {
         window.open(fileData.raw_url, '_blank');
       }
     } catch (err: unknown) {
-      alert(describeError(err, 'İndirme bağlantısı alınamadı'));
+      alert(describeError(err, t('files.download_url_failed')));
     }
   };
 
@@ -276,6 +277,7 @@ export const App: React.FC = () => {
     const targets = selectedNames.has(item.name)
       ? items.filter((i) => selectedNames.has(i.name))
       : [item];
+    draggedItemsRef.current = targets;
     setDraggedItems(targets);
     e.dataTransfer.setData('text/plain', targets.map((i) => i.name).join(','));
     e.dataTransfer.effectAllowed = 'move';
@@ -285,7 +287,8 @@ export const App: React.FC = () => {
   };
 
   const handleDragOverFolder = (folder: FileItem, e: React.DragEvent) => {
-    if (draggedItems.some((i) => i.name === folder.name)) return;
+    const active = draggedItemsRef.current.length > 0 ? draggedItemsRef.current : draggedItems;
+    if (active.some((i) => i.name === folder.name)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverItemName(folder.name);
@@ -300,7 +303,8 @@ export const App: React.FC = () => {
   const handleDropToFolder = async (folder: FileItem, e: React.DragEvent) => {
     e.preventDefault();
     setDragOverItemName(null);
-    const targets = draggedItems.filter((i) => i.name !== folder.name);
+    const active = draggedItemsRef.current.length > 0 ? draggedItemsRef.current : draggedItems;
+    const targets = active.filter((i) => i.name !== folder.name);
     if (targets.length === 0) return;
     const targetDir = joinPath(currentDir, folder.name);
     try {
@@ -313,6 +317,7 @@ export const App: React.FC = () => {
       setError(describeError(err, t('files.move_error')));
     } finally {
       setLoading(false);
+      draggedItemsRef.current = [];
       setDraggedItems([]);
     }
   };
@@ -320,17 +325,19 @@ export const App: React.FC = () => {
   const handleDropToBreadcrumb = async (targetPath: string, e: React.DragEvent) => {
     e.preventDefault();
     setDragOverCrumbPath(null);
-    if (targetPath === currentDir || draggedItems.length === 0) return;
+    const active = draggedItemsRef.current.length > 0 ? draggedItemsRef.current : draggedItems;
+    if (targetPath === currentDir || active.length === 0) return;
     try {
       setLoading(true);
       setError(null);
-      await fsApi.move(currentDir, targetPath, draggedItems.map((i) => i.name));
+      await fsApi.move(currentDir, targetPath, active.map((i) => i.name));
       await loadFiles(currentDir, page, true);
       setSelectedNames(new Set());
     } catch (err: unknown) {
       setError(describeError(err, t('files.move_error')));
     } finally {
       setLoading(false);
+      draggedItemsRef.current = [];
       setDraggedItems([]);
     }
   };
@@ -456,7 +463,7 @@ export const App: React.FC = () => {
                 {loading && items.length === 0 ? (
                   <div className="py-20 text-center text-charcoal-500">
                     <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
-                    <span className="text-sm">Dosyalar yükleniyor...</span>
+                    <span className="text-sm">{t('files.loading_files')}</span>
                   </div>
                 ) : viewMode === 'list' ? (
                   <FileList

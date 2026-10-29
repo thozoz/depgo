@@ -47,12 +47,12 @@ export const TrashManagement: React.FC = () => {
         setTotal(data.total || 0);
         setPage(targetPage);
       } catch (err: unknown) {
-        setError(describeError(err, 'Çöp kutusu listesi alınamadı'));
+        setError(describeError(err, t('trash.load_failed')));
       } finally {
         setLoading(false);
       }
     },
-    []
+    [t]
   );
 
   useEffect(() => {
@@ -72,9 +72,9 @@ export const TrashManagement: React.FC = () => {
       if (err instanceof ApiError && (err.status === 409 || err.code === 409 || err.message.toLowerCase().includes('exist'))) {
         setCollisionItem(item);
         setCustomTargetPath(item.original_path + '.restored');
-        setCollisionError('Orijinal konumda aynı isimde bir dosya veya klasör mevcut. Lütfen alternatif bir geri yükleme yolu girin.');
+        setCollisionError(t('trash.collision_error'));
       } else {
-        alert(describeError(err, 'Geri yükleme başarısız'));
+        alert(describeError(err, t('trash.restore_failed')));
       }
     } finally {
       setActionLoadingId(null);
@@ -90,7 +90,7 @@ export const TrashManagement: React.FC = () => {
       setDeleteConfirmItem(null);
       await fetchTrash(page);
     } catch (err: unknown) {
-      alert(describeError(err, 'Kalıcı silme işlemi başarısız'));
+      alert(describeError(err, t('trash.delete_failed')));
     } finally {
       setActionLoadingId(null);
     }
@@ -103,9 +103,9 @@ export const TrashManagement: React.FC = () => {
       {/* Header bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-3 shadow-xs">
         <div>
-          <h2 className="text-base font-semibold text-charcoal-900">Çöp Kutusu</h2>
+          <h2 className="text-base font-semibold text-charcoal-900">{t('trash.title')}</h2>
           <p className="text-xs text-charcoal-500">
-            Silinmiş yerel dosya ve klasörleri görüntüleyin, geri yükleyin veya kalıcı olarak temizleyin.
+            {t('trash.subtitle')}
           </p>
         </div>
         <button
@@ -113,10 +113,10 @@ export const TrashManagement: React.FC = () => {
           onClick={() => fetchTrash(page)}
           disabled={loading}
           className="flex items-center space-x-1.5 px-3 py-1.5 bg-warm-50 hover:bg-warm-100 border border-charcoal-200 rounded-lg text-xs font-semibold text-charcoal-700 transition-colors self-start sm:self-auto"
-          title="Yenile"
+          title={t('common.refresh')}
         >
           <RefreshIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Yenile</span>
+          <span>{t('common.refresh')}</span>
         </button>
       </div>
 
@@ -129,13 +129,13 @@ export const TrashManagement: React.FC = () => {
       {loading && items.length === 0 ? (
         <div className="py-20 text-center text-charcoal-500 bg-white border border-charcoal-200 rounded-xl">
           <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
-          <span className="text-sm">Çöp kutusu yükleniyor...</span>
+          <span className="text-sm">{t('trash.loading')}</span>
         </div>
       ) : items.length === 0 ? (
         <div className="py-20 text-center text-charcoal-400 bg-white border border-charcoal-200 rounded-xl">
           <TrashIcon className="w-12 h-12 mx-auto mb-2 text-charcoal-300 stroke-1" />
-          <p className="text-sm font-semibold text-charcoal-700">Çöp kutusu boş</p>
-          <p className="text-xs text-charcoal-500 mt-1">Silinen öğeler burada saklanır.</p>
+          <p className="text-sm font-semibold text-charcoal-700">{t('trash.empty')}</p>
+          <p className="text-xs text-charcoal-500 mt-1">{t('trash.empty_desc')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -143,11 +143,11 @@ export const TrashManagement: React.FC = () => {
             <table className="w-full table-fixed sm:table-auto text-left text-sm border-collapse">
               <thead className="bg-warm-50/80 border-b border-charcoal-200 text-xs font-semibold text-charcoal-600 uppercase tracking-wider select-none">
                 <tr>
-                  <th className="py-3 px-4">Orijinal Yol & Ad</th>
-                  <th className="py-3 px-4 w-28 hidden sm:table-cell">Boyut</th>
-                  <th className="py-3 px-4 w-44 hidden md:table-cell">Silinme Tarihi</th>
+                  <th className="py-3 px-4">{t('trash.original_path')}</th>
+                  <th className="py-3 px-4 w-28 hidden sm:table-cell">{t('files.size')}</th>
+                  <th className="py-3 px-4 w-44 hidden md:table-cell">{t('trash.deleted_at')}</th>
                   <th className="py-3 px-2 sm:px-4 w-24 sm:w-56 text-right">
-                    <span className="sr-only sm:not-sr-only">İşlemler</span>
+                    <span className="sr-only sm:not-sr-only">{t('common.actions')}</span>
                   </th>
                 </tr>
               </thead>
@@ -167,7 +167,7 @@ export const TrashManagement: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-xs text-charcoal-500 hidden sm:table-cell">
-                      {item.is_dir ? 'Klasör' : formatBytes(item.size)}
+                      {item.is_dir ? t('files.folder') : formatBytes(item.size)}
                     </td>
                     <td className="py-3 px-4 text-xs text-charcoal-500 hidden md:table-cell">
                       {formatDate(item.deleted_at)}
@@ -179,20 +179,20 @@ export const TrashManagement: React.FC = () => {
                           onClick={() => handleRestore(item)}
                           disabled={actionLoadingId === item.trash_id}
                           className="flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-accent hover:bg-accent/10 border border-accent/30 rounded-lg transition-colors disabled:opacity-40"
-                          title="Geri Yükle"
+                          title={t('trash.restore')}
                         >
                           <RestoreIcon className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Geri Yükle</span>
+                          <span className="hidden sm:inline">{t('trash.restore')}</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setDeleteConfirmItem(item)}
                           disabled={actionLoadingId === item.trash_id}
                           className="flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors disabled:opacity-40"
-                          title="Kalıcı Olarak Sil"
+                          title={t('trash.permanent_delete')}
                         >
                           <TrashIcon className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Kalıcı Olarak Sil</span>
+                          <span className="hidden sm:inline">{t('trash.permanent_delete')}</span>
                         </button>
                       </div>
                     </td>
@@ -206,7 +206,7 @@ export const TrashManagement: React.FC = () => {
           {total > perPage && (
             <div className="flex items-center justify-between px-2 py-1 text-xs text-charcoal-600">
               <span>
-                Toplam {total} öğeden {(page - 1) * perPage + 1} - {Math.min(page * perPage, total)} arası gösteriliyor
+                {t('files.pagination_summary', { total, start: (page - 1) * perPage + 1, end: Math.min(page * perPage, total) })}
               </span>
               <div className="flex items-center space-x-2">
                 <button
@@ -215,7 +215,7 @@ export const TrashManagement: React.FC = () => {
                   disabled={page <= 1 || loading}
                   className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
-                  Önceki
+                  {t('files.previous')}
                 </button>
                 <span className="font-semibold text-charcoal-800">
                   {page} / {totalPages}
@@ -226,7 +226,7 @@ export const TrashManagement: React.FC = () => {
                   disabled={page >= totalPages || loading}
                   className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
-                  Sonraki
+                  {t('files.next')}
                 </button>
               </div>
             </div>
@@ -243,17 +243,17 @@ export const TrashManagement: React.FC = () => {
             setCustomTargetPath('');
             setCollisionError(null);
           }}
-          title="Geri Yükleme Çakışması"
+          title={t('trash.collision_title')}
           icon={<AlertTriangleIcon className="w-5 h-5 text-yellow-600" />}
         >
           <div className="space-y-4">
             <p className="text-sm text-charcoal-600">
-              Orijinal konumda (<span className="font-mono text-xs font-semibold text-charcoal-900">{collisionItem.original_path}</span>) aynı isimde bir öğe zaten mevcut.
+              {t('trash.collision_desc', { path: collisionItem.original_path })}
             </p>
 
             <div>
               <label htmlFor="custom-target-path" className="block text-xs font-semibold text-charcoal-700 mb-1">
-                Alternatif Geri Yükleme Yolu
+                {t('trash.custom_path_label')}
               </label>
               <input
                 id="custom-target-path"
@@ -289,7 +289,7 @@ export const TrashManagement: React.FC = () => {
                 disabled={!customTargetPath.trim() || actionLoadingId === collisionItem.trash_id}
                 className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
               >
-                Bu Konuma Geri Yükle
+                {t('trash.restore_to_path')}
               </button>
             </div>
           </div>
@@ -301,13 +301,13 @@ export const TrashManagement: React.FC = () => {
         <Modal
           isOpen={true}
           onClose={() => setDeleteConfirmItem(null)}
-          title="Kalıcı Olarak Sil"
+          title={t('trash.permanent_delete_title')}
           icon={<TrashIcon className="w-5 h-5 text-red-600" />}
           maxWidthClass="max-w-sm"
         >
           <div className="space-y-4">
             <p className="text-sm text-charcoal-600 break-words">
-              <span className="font-semibold text-charcoal-900">{deleteConfirmItem.original_path}</span> öğesini kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+              {t('trash.permanent_delete_confirm', { path: deleteConfirmItem.original_path })}
             </p>
 
             <div className="flex justify-end space-x-2">
@@ -324,7 +324,7 @@ export const TrashManagement: React.FC = () => {
                 disabled={actionLoadingId === deleteConfirmItem.trash_id}
                 className="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
               >
-                Evet, Kalıcı Olarak Sil
+                {t('common.yes_permanent_delete')}
               </button>
             </div>
           </div>

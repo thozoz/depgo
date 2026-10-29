@@ -35,7 +35,7 @@ export const DeleteDialog: React.FC<DeleteDialogProps> = ({
       await onConfirm(targets);
       onClose();
     } catch (err: unknown) {
-      setError(describeError(err, 'Silme işlemi başarısız'));
+      setError(describeError(err, t('delete.failed')));
     } finally {
       setLoading(false);
     }
@@ -48,19 +48,19 @@ export const DeleteDialog: React.FC<DeleteDialogProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Öğeyi Sil"
+      title={t('delete.title')}
       icon={<TrashIcon className="w-5 h-5 text-red-600" />}
       maxWidthClass="max-w-sm"
     >
       <div className="text-sm text-charcoal-600 mb-4 break-words">
         {isMultiple ? (
-          <p>
-            Seçili <span className="font-semibold text-charcoal-900">{targets.length}</span> öğeyi silmek istediğinize emin misiniz?
-          </p>
+          <p>{t('delete.multiple_confirm', { count: targets.length })}</p>
         ) : (
           <p>
-            <span className="font-semibold text-charcoal-900">{single.name}</span>{' '}
-            {single.is_dir ? 'klasörünü' : 'dosyasını'} silmek istediğinize emin misiniz?
+            {t('delete.single_confirm', {
+              name: single.name,
+              type: single.is_dir ? t('delete.folder') : t('delete.file'),
+            })}
           </p>
         )}
       </div>

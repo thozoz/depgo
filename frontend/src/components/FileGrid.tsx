@@ -142,7 +142,7 @@ export const FileGrid: React.FC<FileGridProps> = ({
                 {onToggleSelect && (
                   <input
                     type="checkbox"
-                    aria-label={`${item.name} seç`}
+                    aria-label={t('files.select_item', { name: item.name })}
                     checked={isSelected}
                     onChange={() => onToggleSelect(item.name)}
                     className="rounded border-charcoal-300 text-accent focus:ring-accent w-4 h-4 cursor-pointer"
@@ -169,7 +169,7 @@ export const FileGrid: React.FC<FileGridProps> = ({
                     />
                     <div
                       role="menu"
-                      aria-label={`${item.name} işlemleri`}
+                      aria-label={t('files.actions_menu', { name: item.name })}
                       className="absolute right-0 top-full mt-1 z-40 w-44 bg-white border border-charcoal-200 rounded-xl shadow-xl py-1 text-left text-xs divide-y divide-charcoal-100"
                     >
                       <div className="py-1">

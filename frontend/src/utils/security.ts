@@ -1,4 +1,5 @@
 import { isInlineRasterImage, isPdf } from './format';
+import { t } from './i18n';
 
 /**
  * Validates that a download/preview URL is strictly on the same origin
@@ -62,7 +63,7 @@ export function validatePreviewContent(
       valid: false,
       detectedType: 'none',
       mimeType: mime,
-      error: 'Güvenlik nedeniyle HTML, SVG veya komut dosyası içerikleri önizlenemez.',
+      error: t('security.dangerous_mime'),
     };
   }
 
@@ -81,7 +82,7 @@ export function validatePreviewContent(
           valid: false,
           detectedType: 'none',
           mimeType: mime,
-          error: 'Dosya içeriği HTML/SVG olarak tespit edildi; güvenlik nedeniyle önizlenemez.',
+          error: t('security.html_svg_detected'),
         };
       }
     } catch {
@@ -110,7 +111,7 @@ export function validatePreviewContent(
       valid: false,
       detectedType: 'none',
       mimeType: mime,
-      error: 'Geçersiz PDF dosyası: Dosya başında geçerli bir PDF imzası (%PDF-) bulunamadı.',
+      error: t('security.invalid_pdf_signature'),
     };
   }
 
@@ -159,7 +160,7 @@ export function validatePreviewContent(
       valid: false,
       detectedType: 'none',
       mimeType: mime,
-      error: 'Geçersiz resim formatı: Desteklenen raster resim imzası (PNG, JPEG, GIF, WebP) bulunamadı.',
+      error: t('security.invalid_image_signature'),
     };
   }
 
@@ -167,6 +168,6 @@ export function validatePreviewContent(
     valid: false,
     detectedType: 'none',
     mimeType: mime,
-    error: 'Desteklenmeyen dosya formatı.',
+    error: t('security.unsupported_format'),
   };
 }

@@ -42,7 +42,7 @@ export const NewFolderModal: React.FC<NewFolderModalProps> = ({ isOpen, onClose,
       await onSubmit(trimmed);
       onClose();
     } catch (err: unknown) {
-      setError(describeError(err, 'Klasör oluşturulamadı'));
+      setError(describeError(err, t('folder.create_failed')));
     } finally {
       setLoading(false);
     }

@@ -17,6 +17,7 @@ import {
   TextPutResp,
 } from '../types';
 import { isAllowedInternalDownloadUrl, validatePreviewContent } from '../utils/security';
+import { t } from '../utils/i18n';
 
 export class ApiError extends Error {
   status: number;
@@ -108,12 +109,12 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 
   if (response.status === 401) {
     handle401();
-    throw new ApiError(401, 401, 'Oturum süresi doldu veya yetkisiz erişim');
+    throw new ApiError(401, 401, t('error.session_expired'));
   }
 
   // Reject HTTP failure regardless of envelope content
   if (!response.ok) {
-    let errorMsg = `Sunucu hatası: ${response.statusText || response.status}`;
+    let errorMsg = t('error.server_error', { status: response.statusText || response.status });
     let errorCode = response.status;
     try {
       const errorJson = await response.json();
@@ -132,16 +133,16 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   try {
     data = await response.json();
   } catch {
-    throw new ApiError(response.status, -1, 'Sunucudan geçersiz JSON yanıt alındı');
+    throw new ApiError(response.status, -1, t('error.invalid_json'));
   }
 
   if (data.code === 401) {
     handle401();
-    throw new ApiError(response.status, data.code, data.message || 'Oturum geçersiz');
+    throw new ApiError(response.status, data.code, data.message || t('error.session_invalid'));
   }
 
   if (data.code !== 200) {
-    throw new ApiError(response.status, data.code, data.message || 'İşlem başarısız');
+    throw new ApiError(response.status, data.code, data.message || t('error.operation_failed'));
   }
 
   return data.data;
@@ -275,7 +276,7 @@ export const fsApi = {
       xhr.onload = () => {
         if (xhr.status === 401) {
           handle401();
-          reject(new ApiError(401, 401, 'Oturum yetkilendirme hatası'));
+          reject(new ApiError(401, 401, t('error.session_auth_error')));
           return;
         }
 
@@ -285,25 +286,25 @@ export const fsApi = {
             resolve();
           } else {
             if (resp.code === 401) handle401();
-            reject(new ApiError(xhr.status, resp.code, resp.message || 'Yükleme başarısız'));
+            reject(new ApiError(xhr.status, resp.code, resp.message || t('error.upload_failed')));
           }
         } catch {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve();
           } else {
-            reject(new ApiError(xhr.status, xhr.status, `Yükleme hatası: HTTP ${xhr.status}`));
+            reject(new ApiError(xhr.status, xhr.status, t('error.upload_error_status', { status: xhr.status })));
           }
         }
       };
 
       xhr.onerror = () => {
-        reject(new ApiError(0, -1, 'Ağ bağlantısı hatası nedeniyle dosya yüklenemedi'));
+        reject(new ApiError(0, -1, t('error.network_upload_failed')));
       };
 
       if (signal) {
         signal.addEventListener('abort', () => {
           xhr.abort();
-          reject(new ApiError(0, -2, 'Yükleme iptal edildi'));
+          reject(new ApiError(0, -2, t('error.upload_cancelled')));
         });
       }
 
@@ -332,7 +333,7 @@ export const fsApi = {
       throw new ApiError(
         400,
         400,
-        'Güvenlik uyarısı: Yalnızca depgo aynı kökenli (/d/, /p/, /sd/, /sp/) dahili indirme yolları önizlenebilir.'
+        t('error.preview_security_origin')
       );
     }
 
@@ -355,31 +356,31 @@ export const fsApi = {
       });
     } catch (err: unknown) {
       if (signal?.aborted) {
-        throw new ApiError(0, 0, 'Önizleme isteği iptal edildi');
+        throw new ApiError(0, 0, t('error.preview_cancelled'));
       }
       throw new ApiError(
         400,
         400,
-        err instanceof Error ? err.message : 'Önizleme isteği yönlendirme veya ağ hatası nedeniyle reddedildi'
+        err instanceof Error ? err.message : t('error.preview_rejected_network')
       );
     }
 
     if (response.status === 401) {
       if (!isPublic) handle401();
-      throw new ApiError(401, 401, 'Yetkisiz erişim');
+      throw new ApiError(401, 401, t('error.unauthorized'));
     }
 
     if (!response.ok) {
-      throw new ApiError(response.status, response.status, `Dosya alınamadı: HTTP ${response.status}`);
+      throw new ApiError(response.status, response.status, t('error.file_fetch_failed', { status: response.status }));
     }
 
     if (response.redirected) {
-      throw new ApiError(400, 400, 'Güvenlik gerekçesiyle yönlendirilmiş önizleme adresleri kabul edilmez.');
+      throw new ApiError(400, 400, t('error.preview_redirect_forbidden'));
     }
 
     // Stream reader with strict byte counter (does not trust Content-Length header alone)
     if (!response.body) {
-      throw new ApiError(500, 500, 'Yanıt gövdesi okunamadı');
+      throw new ApiError(500, 500, t('error.response_body_unread'));
     }
 
     const reader = response.body.getReader();
@@ -397,7 +398,7 @@ export const fsApi = {
             throw new ApiError(
               413,
               413,
-              `Dosya boyutu ${Math.round(maxBytes / (1024 * 1024))} MB sınırını aşıyor.`
+              t('error.preview_size_exceeded', { limit: Math.round(maxBytes / (1024 * 1024)) })
             );
           }
           chunks.push(value);
@@ -405,12 +406,12 @@ export const fsApi = {
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) throw err;
-      if (signal?.aborted) throw new ApiError(0, 0, 'İstek iptal edildi');
-      throw new ApiError(500, 500, 'Dosya akışı okunurken hata oluştu');
+      if (signal?.aborted) throw new ApiError(0, 0, t('error.request_cancelled'));
+      throw new ApiError(500, 500, t('error.stream_read_error'));
     }
 
     if (chunks.length === 0) {
-      throw new ApiError(400, 400, 'Boş dosya içeriği önizlenemez');
+      throw new ApiError(400, 400, t('error.empty_preview'));
     }
 
     // Accumulate up to the first 150 bytes across all received chunks for reliable signature validation
@@ -432,7 +433,7 @@ export const fsApi = {
     );
 
     if (!validation.valid) {
-      throw new ApiError(415, 415, validation.error || 'Dosya içeriği geçerli bir önizleme formatına uymuyor.');
+      throw new ApiError(415, 415, validation.error || t('error.invalid_preview_format'));
     }
 
     return new Blob(chunks as BlobPart[], { type: validation.mimeType });

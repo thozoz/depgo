@@ -1,3 +1,5 @@
+import { t, getLanguage } from './i18n';
+
 export function formatBytes(bytes: number, decimals = 1): string {
   if (!bytes || bytes <= 0) return '0 B';
   const k = 1024;
@@ -13,7 +15,7 @@ export function formatDate(dateInput: string | Date | undefined | null): string 
   try {
     const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     if (isNaN(d.getTime())) return '-';
-    return d.toLocaleString('tr-TR', {
+    return d.toLocaleString(getLanguage() === 'en' ? 'en-US' : 'tr-TR', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -56,7 +58,7 @@ export function splitPath(fullPath: string): { dir: string; name: string } {
 export function getBreadcrumbs(currentPath: string): Array<{ name: string; path: string }> {
   const normalized = joinPath(currentPath);
   const breadcrumbs: Array<{ name: string; path: string }> = [
-    { name: 'Kök Dizin', path: '/' },
+    { name: t('nav.root_dir'), path: '/' },
   ];
   if (normalized === '/') return breadcrumbs;
 
@@ -105,7 +107,7 @@ export function getPreviewEligibility(
   if (isSvgOrHtml(name)) {
     return {
       canPreview: false,
-      reason: 'Güvenlik nedeniyle SVG ve HTML dosyaları önizlenmez, doğrudan indirilir.',
+      reason: t('preview.svg_html_warning'),
       type: 'none',
     };
   }
@@ -116,7 +118,7 @@ export function getPreviewEligibility(
   if (!isRaster && !isPdfFile) {
     return {
       canPreview: false,
-      reason: 'Bu dosya türü için tarayıcı içi önizleme desteklenmiyor.',
+      reason: t('preview.unsupported_type'),
       type: 'none',
     };
   }
@@ -124,7 +126,7 @@ export function getPreviewEligibility(
   if (size !== undefined && size > MAX_PREVIEW_SIZE_BYTES) {
     return {
       canPreview: false,
-      reason: `Dosya boyutu 20 MB sınırını aşıyor (${formatBytes(size)}). Lütfen dosyayı indirin.`,
+      reason: t('preview.size_limit_exceeded', { formattedSize: formatBytes(size) }),
       type: isRaster ? 'raster' : 'pdf',
     };
   }
@@ -175,14 +177,14 @@ export function canEditTextFile(
   if (!isEditableTextFile(name)) {
     return {
       canEdit: false,
-      reason: 'Bu dosya uzantısı metin düzenleyici tarafından desteklenmiyor.',
+      reason: t('editor.unsupported_ext'),
     };
   }
 
   if (size !== undefined && size > MAX_TEXT_SIZE_BYTES) {
     return {
       canEdit: false,
-      reason: `Dosya boyutu 2 MB metin düzenleme sınırını aşıyor (${formatBytes(size)}).`,
+      reason: t('editor.size_limit_exceeded', { formattedSize: formatBytes(size) }),
     };
   }
 

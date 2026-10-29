@@ -44,11 +44,11 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
       setInitialContent(data.content);
       setRevision(data.revision);
     } catch (err: unknown) {
-      setError(describeError(err, 'Metin içeriği yüklenemedi'));
+      setError(describeError(err, t('editor.load_failed')));
     } finally {
       setLoading(false);
     }
-  }, [filePath]);
+  }, [filePath, t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -90,7 +90,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
   const handleSave = async () => {
     const byteLength = getUtf8ByteLength(content);
     if (byteLength > MAX_TEXT_SIZE_BYTES) {
-      setError(`Metin boyutu 5 MB sınırını aşıyor (${formatBytes(byteLength)}).`);
+      setError(t('editor.size_limit_exceeded_editor', { formattedSize: formatBytes(byteLength) }));
       return;
     }
 
@@ -104,11 +104,9 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
       onSaved();
     } catch (err: unknown) {
       if (err instanceof ApiError && (err.status === 409 || err.code === 409)) {
-        setConflict(
-          'Çakışma tespit edildi: Dosya siz düzenlerken başka bir işlem veya kullanıcı tarafından değiştirildi. Kaydetmek mevcut sürümün üzerine yazılmasına neden olabilir. Lütfen güncel içeriği tekrar yükleyin.'
-        );
+        setConflict(t('editor.conflict_desc'));
       } else {
-        setError(describeError(err, 'Kayıt işlemi başarısız'));
+        setError(describeError(err, t('editor.save_failed')));
       }
     } finally {
       setSaving(false);
@@ -116,7 +114,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
   };
 
   const handleReload = async () => {
-    if (isDirty && !window.confirm('Mevcut düzenlemeleriniz kaybolacak. Devam edilsin mi?')) {
+    if (isDirty && !window.confirm(t('editor.unsaved_reload_warning'))) {
       return;
     }
     await loadText();
@@ -146,7 +144,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
             </span>
             {isDirty && (
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-yellow-100 text-yellow-800">
-                Değiştirildi
+                {t('editor.modified_badge')}
               </span>
             )}
           </div>
@@ -154,7 +152,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
             type="button"
             onClick={handleAttemptClose}
             className="p-1.5 text-charcoal-500 hover:text-charcoal-800 rounded-lg hover:bg-charcoal-100 transition-colors"
-            aria-label="Kapat"
+            aria-label={t('common.close')}
           >
             <CloseIcon className="w-5 h-5" />
           </button>
@@ -172,7 +170,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
               onClick={handleReload}
               className="ml-3 px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-medium text-xs flex-shrink-0"
             >
-              Yeniden Yükle
+              {t('editor.reload')}
             </button>
           </div>
         )}
@@ -195,16 +193,16 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
           {loading ? (
             <div className="flex-1 flex flex-col items-center justify-center text-charcoal-500">
               <SpinnerIcon className="w-8 h-8 text-accent animate-spin mb-2" />
-              <span className="text-sm">Metin yükleniyor...</span>
+              <span className="text-sm">{t('editor.loading')}</span>
             </div>
           ) : (
             <textarea
               ref={textareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              aria-label="Metin düzenleyici içeriği"
+              aria-label={t('editor.content_label')}
               className="w-full flex-1 p-4 font-mono text-xs sm:text-sm text-charcoal-900 bg-white resize-none border-0 focus:outline-none focus:ring-0 leading-relaxed overflow-y-auto"
-              placeholder="Dosya içeriği boş..."
+              placeholder={t('editor.empty_placeholder')}
               spellCheck={false}
             />
           )}
@@ -214,10 +212,10 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
         <div className="px-5 py-3 border-t border-charcoal-200 flex items-center justify-between bg-warm-50/70 text-xs text-charcoal-500">
           <div className="flex items-center space-x-4">
             <span>
-              Boyut: <span className="font-mono text-charcoal-700">{formatBytes(byteLength)}</span>
+              {t('files.size')}: <span className="font-mono text-charcoal-700">{formatBytes(byteLength)}</span>
             </span>
             <span>
-              Satır:{' '}
+              {t('editor.line_count')}:{' '}
               <span className="font-mono text-charcoal-700">{content.split('\n').length}</span>
             </span>
           </div>
@@ -243,7 +241,7 @@ export const TextEditorModal: React.FC<TextEditorModalProps> = ({
                   <span>{t('common.saving')}</span>
                 </>
               ) : (
-                <span>Kaydet</span>
+                <span>{t('common.save')}</span>
               )}
             </button>
           </div>

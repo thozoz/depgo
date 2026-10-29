@@ -33,7 +33,7 @@ export const SelectionBar: React.FC<SelectionBarProps> = ({
   return (
     <div
       role="region"
-      aria-label="Çoklu seçim işlemleri"
+      aria-label={t('files.selection_bar_aria')}
       className="flex items-center justify-between px-4 py-2 bg-accent/10 border border-accent/20 rounded-xl text-xs text-charcoal-800 transition-all shadow-xs"
     >
       <div className="flex items-center space-x-3">

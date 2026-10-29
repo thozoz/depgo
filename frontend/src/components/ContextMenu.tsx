@@ -94,7 +94,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       <div
         ref={menuRef}
         role="menu"
-        aria-label={`${item.name} işlemleri`}
+        aria-label={t('files.actions_menu', { name: item.name })}
         style={{ left, top }}
         className="fixed z-50 w-44 max-h-[75vh] overflow-y-auto bg-white border border-charcoal-200 rounded-xl shadow-2xl py-1 text-left text-xs divide-y divide-charcoal-100 animate-in fade-in zoom-in-95 duration-100"
       >

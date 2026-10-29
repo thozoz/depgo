@@ -26,7 +26,7 @@ export const FilterInput: React.FC<FilterInputProps> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={inputPlaceholder}
-        aria-label="Dosyaları filtrele"
+        aria-label={t('files.filter_aria')}
         className="w-full pl-9 pr-8 py-1.5 bg-white border border-charcoal-200 rounded-lg text-sm text-charcoal-800 placeholder-charcoal-400 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors"
       />
       {value && (
@@ -34,7 +34,7 @@ export const FilterInput: React.FC<FilterInputProps> = ({
           type="button"
           onClick={() => onChange('')}
           className="absolute right-2.5 p-0.5 text-charcoal-400 hover:text-charcoal-600 rounded"
-          title="Filtreyi temizle"
+          title={t('files.filter_clear')}
         >
           <CloseIcon className="w-3.5 h-3.5" />
         </button>

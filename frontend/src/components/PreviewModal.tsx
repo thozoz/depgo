@@ -3,6 +3,7 @@ import { fsApi, ApiError } from '../api/client';
 import { formatBytes, isInlineRasterImage, isPdf, isSvgOrHtml, MAX_PREVIEW_SIZE_BYTES } from '../utils/format';
 import { CloseIcon, DownloadIcon, SpinnerIcon, EyeIcon } from './Icons';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface PreviewModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const titleId = React.useId();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (!isOpen) {
@@ -41,7 +43,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
 
     // SVG / HTML active content is strictly download-only
     if (isSvgOrHtml(name)) {
-      setError('Güvenlik nedeniyle SVG ve HTML dosyaları tarayıcıda önizlenmez. Lütfen dosyayı indirin.');
+      setError(t('preview.svg_html_browser'));
       setLoading(false);
       return;
     }
@@ -50,20 +52,20 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
     const isPdfDoc = isPdf(name);
 
     if (!isRaster && !isPdfDoc) {
-      setError('Bu dosya türü için önizleme desteklenmiyor.');
+      setError(t('preview.unsupported_type'));
       setLoading(false);
       return;
     }
 
     if (size !== undefined && size > MAX_PREVIEW_SIZE_BYTES) {
-      setError(`Dosya boyutu 20 MB sınırını aşıyor (${formatBytes(size)}). Lütfen dosyayı indirin.`);
+      setError(t('preview.size_limit_exceeded', { formattedSize: formatBytes(size) }));
       setLoading(false);
       return;
     }
 
     const targetUrl = rawUrl || publicPreviewUrl;
     if (!targetUrl) {
-      setError('Önizleme adresi bulunamadı.');
+      setError(t('preview.url_not_found'));
       return;
     }
 
@@ -92,7 +94,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
         if (err instanceof ApiError) {
           setError(err.message);
         } else {
-          setError(describeError(err, 'Önizleme yüklenemedi'));
+          setError(describeError(err, t('preview.load_failed')));
         }
         setLoading(false);
       });
@@ -157,16 +159,16 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               type="button"
               onClick={onDownload}
               className="flex items-center space-x-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg shadow-sm transition-colors"
-              title="Dosyayı İndir"
+              title={t('preview.download_file')}
             >
               <DownloadIcon className="w-3.5 h-3.5" />
-              <span>İndir</span>
+              <span>{t('common.download')}</span>
             </button>
             <button
               type="button"
               onClick={onClose}
               className="p-1 text-charcoal-400 hover:text-charcoal-700 rounded-lg transition-colors"
-              aria-label="Kapat"
+              aria-label={t('common.close')}
             >
               <CloseIcon className="w-5 h-5" />
             </button>
@@ -178,7 +180,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
           {loading && (
             <div className="flex flex-col items-center space-y-2 text-charcoal-500">
               <SpinnerIcon className="w-8 h-8 text-accent animate-spin" />
-              <span className="text-sm">Önizleme güvenli şekilde hazırlanıyor...</span>
+              <span className="text-sm">{t('preview.preparing_securely')}</span>
             </div>
           )}
 
@@ -191,7 +193,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 className="inline-flex items-center space-x-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
               >
                 <DownloadIcon className="w-4 h-4" />
-                <span>Dosyayı İndir</span>
+                <span>{t('preview.download_file')}</span>
               </button>
             </div>
           )}
@@ -215,7 +217,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
               >
                 <div className="p-6 text-center bg-white rounded-lg border border-charcoal-200 my-auto">
                   <p className="text-sm text-charcoal-600 mb-3">
-                    Tarayıcınız yerleşik PDF görüntüleyiciyi desteklemiyor.
+                    {t('preview.pdf_unsupported')}
                   </p>
                   <button
                     type="button"
@@ -223,7 +225,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                     className="inline-flex items-center space-x-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg"
                   >
                     <DownloadIcon className="w-3.5 h-3.5" />
-                    <span>PDF'i İndir</span>
+                    <span>{t('preview.download_pdf')}</span>
                   </button>
                 </div>
               </object>

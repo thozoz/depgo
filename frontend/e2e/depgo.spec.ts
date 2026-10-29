@@ -346,4 +346,92 @@ test.describe.serial('Depgo real browser lifecycle', () => {
       await guest.close();
     }
   });
+
+  test('single file drag-and-drop moves file into folder', async ({ page }) => {
+    await call('/api/fs/mkdir', { path: `${root}/subfolder-single` });
+    await upload('single-move.txt', Buffer.from('single file move test'));
+    await page.getByRole('button', { name: 'Yenile' }).click();
+    await expect(row(page, 'single-move.txt')).toBeVisible();
+    await expect(row(page, 'subfolder-single')).toBeVisible();
+
+    await row(page, 'single-move.txt').dragTo(row(page, 'subfolder-single'));
+    await expect(row(page, 'single-move.txt')).toBeHidden();
+
+    await page.getByRole('button', { name: 'subfolder-single', exact: true }).click();
+    await expect(row(page, 'single-move.txt')).toBeVisible();
+    expect((await call(`/api/fs/text?path=${encodeURIComponent(`${root}/subfolder-single/single-move.txt`)}`, undefined, 'GET')).content).toBe('single file move test');
+
+    await page.getByRole('button', { name: folder, exact: true }).click();
+    await expect(row(page, 'document.txt')).toBeVisible();
+  });
+
+  test('multi-selection drag-and-drop moves all selected items', async ({ page }) => {
+    await call('/api/fs/mkdir', { path: `${root}/subfolder-multi` });
+    await upload('multi-a.txt', Buffer.from('multi a content'));
+    await upload('multi-b.txt', Buffer.from('multi b content'));
+    await page.getByRole('button', { name: 'Yenile' }).click();
+    await expect(row(page, 'multi-a.txt')).toBeVisible();
+    await expect(row(page, 'multi-b.txt')).toBeVisible();
+
+    await row(page, 'multi-a.txt').getByRole('checkbox').check();
+    await row(page, 'multi-b.txt').getByRole('checkbox').check();
+    await expect(page.getByText('2 öğe seçildi')).toBeVisible();
+
+    await row(page, 'multi-a.txt').dragTo(row(page, 'subfolder-multi'));
+    await expect(row(page, 'multi-a.txt')).toBeHidden();
+    await expect(row(page, 'multi-b.txt')).toBeHidden();
+
+    await page.getByRole('button', { name: 'subfolder-multi', exact: true }).click();
+    await expect(row(page, 'multi-a.txt')).toBeVisible();
+    await expect(row(page, 'multi-b.txt')).toBeVisible();
+    expect((await call(`/api/fs/text?path=${encodeURIComponent(`${root}/subfolder-multi/multi-a.txt`)}`, undefined, 'GET')).content).toBe('multi a content');
+    expect((await call(`/api/fs/text?path=${encodeURIComponent(`${root}/subfolder-multi/multi-b.txt`)}`, undefined, 'GET')).content).toBe('multi b content');
+
+    await page.getByRole('button', { name: folder, exact: true }).click();
+    await expect(row(page, 'document.txt')).toBeVisible();
+  });
+
+  test('drag conflict (409) leaves file in place and does not corrupt target', async ({ page }) => {
+    await call('/api/fs/mkdir', { path: `${root}/subfolder-conflict` });
+    await upload('conflict-target.txt', Buffer.from('original source content'));
+    const targetPath = `${root}/subfolder-conflict/conflict-target.txt`;
+    const putRes = await api.put('/api/fs/put', {
+      headers: {
+        Authorization: token,
+        'File-Path': encodeURIComponent(targetPath),
+        'As-Task': 'false',
+        Overwrite: 'false',
+        'Content-Type': 'application/octet-stream',
+      },
+      data: Buffer.from('target untouched content'),
+    });
+    const putBody = await putRes.json();
+    expect(putBody.code, putBody.message).toBe(200);
+
+    await page.getByRole('button', { name: 'Yenile' }).click();
+    await expect(row(page, 'conflict-target.txt')).toBeVisible();
+    await expect(row(page, 'subfolder-conflict')).toBeVisible();
+
+    await row(page, 'conflict-target.txt').dragTo(row(page, 'subfolder-conflict'));
+    await expect(page.getByText('409')).toBeVisible();
+
+    await expect(row(page, 'conflict-target.txt')).toBeVisible();
+    expect((await call(`/api/fs/text?path=${encodeURIComponent(`${root}/conflict-target.txt`)}`, undefined, 'GET')).content).toBe('original source content');
+    expect((await call(`/api/fs/text?path=${encodeURIComponent(targetPath)}`, undefined, 'GET')).content).toBe('target untouched content');
+  });
+
+  test('switching to EN leaves no Turkish characters on Shares view', async ({ page }) => {
+    await page.getByRole('button', { name: /^(en|english)$/i }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+    await page.getByRole('button', { name: 'Shares', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Share Links', exact: true })).toBeVisible();
+
+    const mainText = await page.locator('main').innerText();
+    expect(mainText).not.toMatch(/[ğüşöçıİĞÜŞÖÇ]/);
+
+    await page.getByRole('button', { name: /^(tr|turkish|türkçe)$/i }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'tr');
+    await page.getByRole('button', { name: 'Dosyalar', exact: true }).click();
+  });
 });

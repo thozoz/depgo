@@ -73,7 +73,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (slug && !/^[A-Za-z0-9_-]{1,32}$/.test(slug)) {
-      setError('Özel bağlantı adı (slug) 1-32 karakter uzunluğunda olmalı ve yalnızca harf, rakam, alt çizgi veya tire içermelidir.');
+      setError(t('share.slug_invalid'));
       return;
     }
 
@@ -110,7 +110,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       setCreatedShare(result);
       if (onSuccess) onSuccess();
     } catch (err: unknown) {
-      setError(describeShareError(err, 'Paylaşım işlemi başarısız'));
+      setError(describeShareError(err, t('share.failed')));
     } finally {
       setLoading(false);
     }
@@ -130,7 +130,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={existingShare ? 'Paylaşım Bağlantısını Düzenle' : 'Paylaşım Bağlantısı Oluştur'}
+      title={existingShare ? t('share.edit_title') : t('share.title')}
       icon={<ShareIcon className="w-5 h-5 text-accent" />}
       maxWidthClass="max-w-lg"
     >
@@ -138,7 +138,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       {createdShare && (
         <div className="p-4 bg-accent/10 border border-accent/20 rounded-xl mb-5 space-y-2">
           <span className="text-xs font-semibold text-accent-dark uppercase tracking-wide">
-            Paylaşım Bağlantınız Hazır
+            {t('share.ready_title')}
           </span>
           <div className="flex items-center space-x-2">
             <input
@@ -158,7 +158,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
           {createdShare.burn_after_read && (
             <p className="text-[11px] text-yellow-700">
-              Bu bağlantı tek okumalık: bir kez kullanıldıktan sonra otomatik olarak silinecektir.
+              {t('share.burn_notice_short')}
             </p>
           )}
         </div>
@@ -167,14 +167,14 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="share-name-input" className="block text-xs font-semibold text-charcoal-700 mb-1">
-            Paylaşım Başlığı
+            {t('share.name_label')}
           </label>
           <input
             id="share-name-input"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Başlık girin"
+            placeholder={t('share.title_placeholder')}
             className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
             disabled={loading}
           />
@@ -211,8 +211,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             onChange={(e) => setPassword(e.target.value)}
             placeholder={
               existingShare?.has_password
-                ? 'Yeni parola girin (mevcut parolayı korumak için boş bırakın)'
-                : 'Parola belirleyin'
+                ? t('share.pwd_keep_placeholder')
+                : t('share.pwd_placeholder')
             }
             className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent disabled:bg-charcoal-50 disabled:text-charcoal-400"
             disabled={loading || removePassword}
@@ -229,7 +229,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                 disabled={loading}
                 className="rounded border-charcoal-300 text-accent focus:ring-accent/30"
               />
-              <span>Parolayı kaldır (bağlantıyı bilen herkes açabilir)</span>
+              <span>{t('share.remove_password')}</span>
             </label>
           )}
         </div>
@@ -237,7 +237,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         {!existingShare && (
           <div>
             <label htmlFor="share-expire-select" className="block text-xs font-semibold text-charcoal-700 mb-1">
-              Son Kullanma Süresi
+              {t('share.expiration_label')}
             </label>
             <select
               id="share-expire-select"
@@ -246,12 +246,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               className="w-full px-3 py-2 border border-charcoal-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent bg-white"
               disabled={loading}
             >
-              <option value={0}>Süresiz</option>
-              <option value={1}>1 Saat</option>
-              <option value={24}>24 Saat (1 Gün)</option>
-              <option value={72}>3 Gün</option>
-              <option value={168}>7 Gün (1 Hafta)</option>
-              <option value={720}>30 Gün (1 Ay)</option>
+              <option value={0}>{t('share.exp_unlimited')}</option>
+              <option value={1}>{t('share.exp_1h')}</option>
+              <option value={24}>{t('share.exp_24h')}</option>
+              <option value={72}>{t('share.exp_3d')}</option>
+              <option value={168}>{t('share.exp_7d')}</option>
+              <option value={720}>{t('share.exp_30d')}</option>
             </select>
           </div>
         )}
@@ -264,7 +264,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               onChange={(e) => setAllowPreview(e.target.checked)}
               className="rounded text-accent focus:ring-accent"
             />
-            <span>Tarayıcı içi önizlemeye izin ver</span>
+            <span>{t('share.allow_preview')}</span>
           </label>
 
           <label className="flex items-center space-x-2 text-xs text-charcoal-700 cursor-pointer">
@@ -274,7 +274,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               onChange={(e) => setAllowDownload(e.target.checked)}
               className="rounded text-accent focus:ring-accent"
             />
-            <span>İndirmeye izin ver</span>
+            <span>{t('share.allow_download')}</span>
           </label>
 
           <label className="flex items-start space-x-2 text-xs text-charcoal-700 cursor-pointer">
@@ -314,7 +314,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
             disabled={loading}
             className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
           >
-            {loading ? t('common.saving') : existingShare ? 'Güncelle' : 'Paylaşım Oluştur'}
+            {loading ? t('common.saving') : existingShare ? t('common.update') : t('share.submit')}
           </button>
         </div>
       </form>

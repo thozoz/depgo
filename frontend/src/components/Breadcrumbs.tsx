@@ -25,7 +25,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
   const crumbs = getBreadcrumbs(currentPath);
 
   return (
-    <nav aria-label="Klasör Gezintisi" className="flex items-center space-x-1 text-sm overflow-x-auto py-1 min-w-0">
+    <nav aria-label={t('nav.breadcrumb_aria')} className="flex items-center space-x-1 text-sm overflow-x-auto py-1 min-w-0">
       {crumbs.map((crumb, idx) => {
         const isLast = idx === crumbs.length - 1;
         const isRoot = idx === 0;

@@ -5,6 +5,9 @@ import { ApiError } from '../api/client';
 
 describe('i18n language infrastructure', () => {
   beforeEach(() => {
+    (globalThis as any).document = {
+      documentElement: { lang: 'tr' },
+    };
     setLanguage('tr');
   });
 
@@ -13,10 +16,11 @@ describe('i18n language infrastructure', () => {
     expect(t('files.upload')).toBe('Dosya Yükle');
   });
 
-  it('switches to English properly', () => {
+  it('switches to English properly and updates document.documentElement.lang', () => {
     setLanguage('en');
     expect(getLanguage()).toBe('en');
     expect(t('files.upload')).toBe('Upload File');
+    expect(document.documentElement.lang).toBe('en');
   });
 
   it('interpolates parameters', () => {

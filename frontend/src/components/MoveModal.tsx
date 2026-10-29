@@ -45,7 +45,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
     const normalizedTarget = joinPath(targetDir.trim());
 
     if (normalizedTarget === joinPath(currentDir)) {
-      setError('Hedef klasör mevcut klasör ile aynı olamaz');
+      setError(t('move.same_folder_error'));
       return;
     }
 
@@ -68,20 +68,20 @@ export const MoveModal: React.FC<MoveModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Öğeyi Taşı"
+      title={t('move.title')}
       icon={<MoveIcon className="w-5 h-5 text-accent" />}
     >
       <div className="text-sm text-charcoal-600 mb-4 truncate">
-        Taşınacak:{' '}
+        {t('move.moving_item')}{' '}
         <span className="font-semibold text-charcoal-900">
-          {isMultiple ? `${targets.length} öğe` : single.name}
+          {isMultiple ? t('files.item_count', { count: targets.length }) : single.name}
         </span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="target-dir" className="block text-xs font-medium text-charcoal-700 mb-1">
-            Hedef Klasör Yolu
+            {t('move.target_dir_label')}
           </label>
           <input
             id="target-dir"
@@ -92,7 +92,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
             placeholder="/"
             className="w-full px-3 py-2 text-sm border border-charcoal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
           />
-          <p className="mt-1 text-xs text-charcoal-400">Örnek: /belgeler veya /</p>
+          <p className="mt-1 text-xs text-charcoal-400">{t('move.example_path')}</p>
         </div>
 
         {error && (

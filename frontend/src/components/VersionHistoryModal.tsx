@@ -46,12 +46,12 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
         setTotal(data.total || 0);
         setPage(targetPage);
       } catch (err: unknown) {
-        setError(describeError(err, 'Sürüm geçmişi alınamadı'));
+        setError(describeError(err, t('versions.load_failed')));
       } finally {
         setLoading(false);
       }
     },
-    [filePath]
+    [filePath, t]
   );
 
   useEffect(() => {
@@ -78,11 +78,9 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
       await fetchVersions(1);
     } catch (err: unknown) {
       if (err instanceof ApiError && (err.status === 409 || err.status === 412 || err.code === 409 || err.code === 412)) {
-        setConflict(
-          'Sürüm çakışması (409/412): Dosya başka bir işlem tarafından değiştirilmiş. Lütfen güncel sürüm listesini yenileyip tekrar deneyin.'
-        );
+        setConflict(t('versions.conflict_desc'));
       } else {
-        setError(describeError(err, 'Sürüm geri yüklenemedi'));
+        setError(describeError(err, t('versions.restore_failed')));
       }
     } finally {
       setRestoringId(null);
@@ -95,7 +93,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Sürüm Geçmişi"
+      title={t('versions.title')}
       icon={<HistoryIcon className="w-5 h-5 text-accent" />}
       maxWidthClass="max-w-2xl"
     >
@@ -103,10 +101,10 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
         {/* Info header */}
         <div className="flex items-center justify-between pb-3 border-b border-charcoal-100 text-xs">
           <div>
-            <span className="text-charcoal-500">Dosya: </span>
+            <span className="text-charcoal-500">{t('versions.file_label')}: </span>
             <span className="font-semibold text-charcoal-900">{fileName}</span>
             <span className="ml-2 font-mono px-2 py-0.5 rounded bg-accent/10 text-accent font-medium">
-              Aktif Rev #{currentRevision}
+              {t('versions.active_rev', { revision: currentRevision })}
             </span>
           </div>
 
@@ -138,21 +136,21 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
         {loading && versions.length === 0 ? (
           <div className="py-12 text-center text-charcoal-500">
             <SpinnerIcon className="w-6 h-6 text-accent animate-spin mx-auto mb-2" />
-            <span className="text-xs">Sürümler yükleniyor...</span>
+            <span className="text-xs">{t('versions.loading')}</span>
           </div>
         ) : versions.length === 0 ? (
           <div className="py-12 text-center text-charcoal-400">
-            <p className="text-xs">Bu dosya için kaydedilmiş önceki bir sürüm bulunamadı.</p>
+            <p className="text-xs">{t('versions.empty')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto border border-charcoal-200 rounded-xl">
             <table className="w-full text-left text-xs">
               <thead className="bg-warm-100 text-charcoal-600 border-b border-charcoal-200 font-medium">
                 <tr>
-                  <th className="py-2.5 px-3">Revizyon</th>
-                  <th className="py-2.5 px-3">Boyut</th>
-                  <th className="py-2.5 px-3">Kayıt Tarihi</th>
-                  <th className="py-2.5 px-3 text-right">İşlem</th>
+                  <th className="py-2.5 px-3">{t('versions.revision')}</th>
+                  <th className="py-2.5 px-3">{t('files.size')}</th>
+                  <th className="py-2.5 px-3">{t('versions.saved_date')}</th>
+                  <th className="py-2.5 px-3 text-right">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-charcoal-100">
@@ -171,7 +169,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                           Rev #{ver.revision}
                         </span>
                         {isCurrent && (
-                          <span className="ml-2 text-[11px] text-accent font-semibold">(Mevcut)</span>
+                          <span className="ml-2 text-[11px] text-accent font-semibold">({t('versions.current')})</span>
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-charcoal-500">{formatBytes(ver.size)}</td>
@@ -185,7 +183,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                             className="inline-flex items-center space-x-1 px-2.5 py-1 bg-white border border-charcoal-200 hover:border-accent hover:text-accent rounded text-[11px] font-medium transition-colors disabled:opacity-40"
                           >
                             <RestoreIcon className="w-3 h-3" />
-                            <span>Geri Dön</span>
+                            <span>{t('versions.restore_button')}</span>
                           </button>
                         )}
                       </td>
@@ -200,7 +198,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
         {/* Pagination */}
         {total > perPage && (
           <div className="flex items-center justify-between pt-2 text-xs text-charcoal-500">
-            <span>Toplam {total} sürüm</span>
+            <span>{t('versions.total_versions', { count: total })}</span>
             <div className="flex space-x-1">
               <button
                 type="button"
@@ -208,7 +206,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                 disabled={page <= 1 || loading}
                 className="px-2 py-0.5 border border-charcoal-200 rounded disabled:opacity-40"
               >
-                Önceki
+                {t('files.previous')}
               </button>
               <button
                 type="button"
@@ -216,7 +214,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
                 disabled={page >= totalPages || loading}
                 className="px-2 py-0.5 border border-charcoal-200 rounded disabled:opacity-40"
               >
-                Sonraki
+                {t('files.next')}
               </button>
             </div>
           </div>

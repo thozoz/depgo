@@ -20,12 +20,14 @@ import {
 } from './Icons';
 import { PreviewModal } from './PreviewModal';
 import { describeError, describeShareError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface GuestShareViewProps {
   shareId: string;
 }
 
 export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
+  const { t } = useTranslation();
   const [info, setInfo] = useState<PublicShareInfoResp | null>(null);
   const [currentPath, setCurrentPath] = useState('/');
   const [items, setItems] = useState<PublicShareObjResp[]>([]);
@@ -69,7 +71,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
         setTotalItems(1);
       }
     } catch (err: unknown) {
-      setError(describeShareError(err, 'Paylaşım bilgisi alınamadı'));
+      setError(describeShareError(err, t('guest.info_failed')));
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
       setPage(targetPage);
       setCurrentPath(path);
     } catch (err: unknown) {
-      setError(describeShareError(err, 'Klasör içeriği yüklenemedi'));
+      setError(describeShareError(err, t('guest.dir_failed')));
     } finally {
       setLoading(false);
     }
@@ -98,7 +100,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) {
-      setAuthError('Lütfen parolayı girin');
+      setAuthError(t('guest.enter_password'));
       return;
     }
 
@@ -117,7 +119,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
         setTotalItems(1);
       }
     } catch (err: unknown) {
-      setAuthError(describeError(err, 'Parola hatalı'));
+      setAuthError(describeError(err, t('error.incorrect_password')));
     } finally {
       setAuthLoading(false);
     }
@@ -155,9 +157,9 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
           <div className="w-12 h-12 rounded-2xl bg-yellow-50 text-yellow-600 flex items-center justify-center mx-auto mb-4 border border-yellow-200">
             <LockIcon className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-semibold text-charcoal-900 mb-1">Korumalı Paylaşım</h2>
+          <h2 className="text-lg font-semibold text-charcoal-900 mb-1">{t('share.protected_title')}</h2>
           <p className="text-xs text-charcoal-500 mb-6">
-            Bu içeriğe erişmek için lütfen erişim parolasını girin.
+            {t('share.protected_desc')}
           </p>
 
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
@@ -165,7 +167,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Parola"
+              placeholder={t('share.password_placeholder')}
               autoFocus
               className="w-full px-3.5 py-2.5 border border-charcoal-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
               disabled={authLoading}
@@ -182,7 +184,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
               disabled={authLoading || !password}
               className="w-full py-2.5 bg-accent hover:bg-accent-hover text-white text-sm font-semibold rounded-xl shadow-xs transition-colors disabled:opacity-50"
             >
-              {authLoading ? 'Doğrulanıyor...' : 'Erişimi Aç'}
+              {authLoading ? t('share.verifying') : t('share.unlock_button')}
             </button>
           </form>
         </div>
@@ -198,13 +200,13 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
           <div className="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4">
             <LockIcon className="w-6 h-6" />
           </div>
-          <h2 className="text-lg font-semibold text-charcoal-900 mb-2">Paylaşıma Erişilemedi</h2>
+          <h2 className="text-lg font-semibold text-charcoal-900 mb-2">{t('guest.access_failed_title')}</h2>
           <p className="text-sm text-charcoal-600 mb-6">{error}</p>
           <a
             href="/"
             className="inline-block px-4 py-2 bg-charcoal-800 text-white rounded-lg text-sm font-medium hover:bg-charcoal-900"
           >
-            Ana Sayfaya Dön
+            {t('common.home')}
           </a>
         </div>
       </div>
@@ -222,11 +224,11 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
           <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center font-bold text-base">
             D
           </div>
-          <span className="font-semibold text-charcoal-900 text-base">Depgo Paylaşımı</span>
+          <span className="font-semibold text-charcoal-900 text-base">{t('share.guest_title')}</span>
         </div>
         {info && (
           <div className="text-xs text-charcoal-500 truncate max-w-xs sm:max-w-md">
-            Paylaşılan: <span className="font-medium text-charcoal-800">{info.name}</span>
+            {t('guest.shared_label', { name: info.name })}
           </div>
         )}
       </header>
@@ -235,7 +237,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-4">
         {info?.burn_after_read && (
           <div role="note" className="px-4 py-2.5 rounded-xl bg-yellow-50 border border-yellow-200 text-xs text-yellow-800 font-medium">
-            Bu bağlantı tek okumalık: dosyayı önizlediğinizde veya indirdiğinizde paylaşım silinir ve bir daha açılamaz.
+            {t('share.guest_burn_notice')}
           </div>
         )}
 
@@ -271,21 +273,21 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
           {loading && items.length === 0 ? (
             <div className="py-20 text-center text-charcoal-500">
               <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
-              <span className="text-sm">İçerik yükleniyor...</span>
+              <span className="text-sm">{t('guest.loading_content')}</span>
             </div>
           ) : items.length === 0 ? (
             <div className="py-16 text-center text-charcoal-400">
               <FolderIcon className="w-12 h-12 mx-auto mb-2 text-charcoal-300 stroke-1" />
-              <p className="text-sm font-medium">Bu klasörde görüntülenecek öğe bulunamadı.</p>
+              <p className="text-sm font-medium">{t('files.empty_directory')}</p>
             </div>
           ) : (
             <table className="w-full text-left text-sm border-collapse">
               <thead className="bg-warm-50/80 border-b border-charcoal-200 text-xs font-semibold text-charcoal-600 uppercase tracking-wider select-none">
                 <tr>
-                  <th className="py-3 px-4">Ad</th>
-                  <th className="py-3 px-4 w-28 hidden sm:table-cell">Boyut</th>
-                  <th className="py-3 px-4 w-44 hidden md:table-cell">Değiştirilme</th>
-                  <th className="py-3 px-4 w-28 text-right">İşlemler</th>
+                  <th className="py-3 px-4">{t('files.name')}</th>
+                  <th className="py-3 px-4 w-28 hidden sm:table-cell">{t('files.size')}</th>
+                  <th className="py-3 px-4 w-44 hidden md:table-cell">{t('files.modified')}</th>
+                  <th className="py-3 px-4 w-28 text-right">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-charcoal-100">
@@ -326,7 +328,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
                               type="button"
                               onClick={() => setPreviewItem(item)}
                               className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-md transition-colors"
-                              title="Önizle"
+                              title={t('common.preview')}
                             >
                               <EyeIcon className="w-4 h-4" />
                             </button>
@@ -336,7 +338,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
                               type="button"
                               onClick={() => handleDownload(item)}
                               className="p-1.5 text-charcoal-500 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-md transition-colors"
-                              title="İndir"
+                              title={t('common.download')}
                             >
                               <DownloadIcon className="w-4 h-4" />
                             </button>
@@ -355,7 +357,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-2 py-1 text-xs text-charcoal-600">
             <span>
-              Toplam {totalItems} öğeden {(page - 1) * perPage + 1} - {Math.min(page * perPage, totalItems)} arası gösteriliyor
+              {t('files.pagination_summary', { total: totalItems, start: (page - 1) * perPage + 1, end: Math.min(page * perPage, totalItems) })}
             </span>
             <div className="flex items-center space-x-2">
               <button
@@ -364,7 +366,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
                 disabled={page <= 1 || loading}
                 className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
               >
-                Önceki
+                {t('files.previous')}
               </button>
               <span className="font-semibold text-charcoal-800">
                 {page} / {totalPages}
@@ -375,7 +377,7 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
                 disabled={(!hasMore && page >= totalPages) || loading}
                 className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
               >
-                Sonraki
+                {t('files.next')}
               </button>
             </div>
           </div>

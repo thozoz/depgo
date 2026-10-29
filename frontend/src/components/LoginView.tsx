@@ -18,7 +18,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password) {
-      setError('Lütfen kullanıcı adı ve şifrenizi girin');
+      setError(t('login.required_fields'));
       return;
     }
 
@@ -28,7 +28,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
       await authApi.login(username.trim(), password);
       onLoginSuccess();
     } catch (err: unknown) {
-      setError(describeError(err, 'Giriş yapılamadı. Bilgilerinizi kontrol edin.'));
+      setError(describeError(err, t('login.failed')));
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           className={`px-2 py-1 rounded transition-all ${
             lang === 'tr' ? 'bg-warm-100 font-semibold text-charcoal-900 shadow-xs' : 'hover:text-charcoal-900'
           }`}
-          aria-label="Türkçe"
+          aria-label={t('nav.lang_tr')}
         >
           TR
         </button>
@@ -54,7 +54,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           className={`px-2 py-1 rounded transition-all ${
             lang === 'en' ? 'bg-warm-100 font-semibold text-charcoal-900 shadow-xs' : 'hover:text-charcoal-900'
           }`}
-          aria-label="English"
+          aria-label={t('nav.lang_en')}
         >
           EN
         </button>

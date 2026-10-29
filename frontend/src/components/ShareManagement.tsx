@@ -45,7 +45,7 @@ export const ShareManagement: React.FC = () => {
       setTotal(resp.total || 0);
       setPage(targetPage);
     } catch (err: unknown) {
-      setError(describeShareError(err, 'Paylaşımlar yüklenemedi'));
+      setError(describeShareError(err, t('share.load_failed')));
     } finally {
       setLoading(false);
     }
@@ -63,39 +63,39 @@ export const ShareManagement: React.FC = () => {
   };
 
   const handleDisable = async (share: ShareResp) => {
-    if (!window.confirm(`"${share.name}" bağlantısı kapatılsın mı? Bağlantı çalışmayı bırakır ama kaydı ve adresi kalır; istediğin zaman yeniden etkinleştirebilirsin.`)) {
+    if (!window.confirm(t('share.disable_confirm', { name: share.name }))) {
       return;
     }
     try {
       await shareApi.disable(share.share_id);
       fetchShares(page);
     } catch (err: unknown) {
-      alert(describeShareError(err, 'Paylaşım kapatılamadı'));
+      alert(describeShareError(err, t('share.disable_failed')));
     }
   };
 
   const handleEnable = async (share: ShareResp) => {
     const spent = share.access_limit > 0 && share.remaining_accesses === 0;
-    if (spent && !window.confirm('Bu bağlantının erişim hakkı dolmuştu. Yeniden etkinleştirince hak sıfırlanır ve bağlantı tekrar okunabilir. Devam edilsin mi?')) {
+    if (spent && !window.confirm(t('share.enable_spent_confirm'))) {
       return;
     }
     try {
       await shareApi.enable(share.share_id);
       fetchShares(page);
     } catch (err: unknown) {
-      alert(describeShareError(err, 'Paylaşım etkinleştirilemedi'));
+      alert(describeShareError(err, t('share.enable_failed')));
     }
   };
 
   const handleDelete = async (shareId: string) => {
-    if (!window.confirm('Bu paylaşım bağlantısını tamamen silmek istediğinize emin misiniz?')) {
+    if (!window.confirm(t('share.delete_confirm'))) {
       return;
     }
     try {
       await shareApi.delete(shareId);
       fetchShares(page);
     } catch (err: unknown) {
-      alert(describeShareError(err, 'Paylaşım silinemedi'));
+      alert(describeShareError(err, t('share.delete_failed')));
     }
   };
 
@@ -106,9 +106,9 @@ export const ShareManagement: React.FC = () => {
       {/* Header bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-3 shadow-xs">
         <div>
-          <h2 className="text-base font-semibold text-charcoal-900">Paylaşım Bağlantıları</h2>
+          <h2 className="text-base font-semibold text-charcoal-900">{t('share.header_title')}</h2>
           <p className="text-xs text-charcoal-500">
-            Dış kullanıcılar için oluşturulan dosya ve klasör bağlantılarını yönetin.
+            {t('share.header_desc')}
           </p>
         </div>
         <button
@@ -116,7 +116,7 @@ export const ShareManagement: React.FC = () => {
           onClick={() => fetchShares(page)}
           disabled={loading}
           className="flex items-center space-x-1.5 px-3 py-1.5 bg-warm-50 hover:bg-warm-100 border border-charcoal-200 rounded-lg text-xs font-semibold text-charcoal-700 transition-colors self-start sm:self-auto"
-          title="Listeyi Yenile"
+          title={t('common.refresh')}
         >
           <RefreshIcon className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>{t('common.refresh')}</span>
@@ -132,14 +132,14 @@ export const ShareManagement: React.FC = () => {
       {loading && shares.length === 0 ? (
         <div className="py-20 text-center text-charcoal-500 bg-white border border-charcoal-200 rounded-xl">
           <SpinnerIcon className="w-8 h-8 text-accent animate-spin mx-auto mb-2" />
-          <span className="text-sm">Paylaşımlar yükleniyor...</span>
+          <span className="text-sm">{t('share.loading_shares')}</span>
         </div>
       ) : shares.length === 0 ? (
         <div className="py-20 text-center text-charcoal-400 bg-white border border-charcoal-200 rounded-xl">
           <ShareIcon className="w-12 h-12 mx-auto mb-2 text-charcoal-300 stroke-1" />
-          <p className="text-sm font-semibold text-charcoal-700">Henüz aktif bir paylaşım bağlantısı yok</p>
+          <p className="text-sm font-semibold text-charcoal-700">{t('share.no_active')}</p>
           <p className="text-xs text-charcoal-500 mt-1">
-            Dosyalar sekmesinden bir dosya veya klasör seçip "Paylaş" butonuna tıklayarak bağlantı oluşturabilirsiniz.
+            {t('share.no_active_desc')}
           </p>
         </div>
       ) : (
@@ -148,13 +148,13 @@ export const ShareManagement: React.FC = () => {
             <table className="w-full text-left text-sm border-collapse">
               <thead className="bg-warm-50/80 border-b border-charcoal-200 text-xs font-semibold text-charcoal-600 uppercase tracking-wider select-none">
                 <tr>
-                  <th className="py-3 px-4">Bağlantı & Ad</th>
-                  <th className="py-3 px-4 hidden md:table-cell">Kök Yol</th>
-                  <th className="py-3 px-4 hidden sm:table-cell">Güvenlik</th>
-                  <th className="py-3 px-4 hidden lg:table-cell">Son Kullanma</th>
-                  <th className="py-3 px-4 hidden sm:table-cell">Görüntüleme</th>
-                  <th className="py-3 px-4">Durum</th>
-                  <th className="py-3 px-4 text-right">İşlemler</th>
+                  <th className="py-3 px-4">{t('share.th_link_name')}</th>
+                  <th className="py-3 px-4 hidden md:table-cell">{t('share.th_root_path')}</th>
+                  <th className="py-3 px-4 hidden sm:table-cell">{t('share.th_security')}</th>
+                  <th className="py-3 px-4 hidden lg:table-cell">{t('share.th_expiration')}</th>
+                  <th className="py-3 px-4 hidden sm:table-cell">{t('share.th_views')}</th>
+                  <th className="py-3 px-4">{t('share.th_status')}</th>
+                  <th className="py-3 px-4 text-right">{t('share.th_actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-charcoal-100">
@@ -176,7 +176,7 @@ export const ShareManagement: React.FC = () => {
                             type="button"
                             onClick={() => handleCopy(share.share_id)}
                             className="p-1 text-charcoal-400 hover:text-charcoal-700 rounded-md transition-colors"
-                            title="Bağlantıyı Kopyala"
+                            title={t('share.copy_button')}
                           >
                             {copiedId === share.share_id ? (
                               <CheckIcon className="w-3.5 h-3.5 text-accent" />
@@ -194,17 +194,17 @@ export const ShareManagement: React.FC = () => {
                       {share.has_password ? (
                         <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md bg-yellow-50 text-yellow-700 border border-yellow-200">
                           <LockIcon className="w-3 h-3" />
-                          <span>Parolalı</span>
+                          <span>{t('share.badge_password')}</span>
                         </span>
                       ) : (
-                        <span className="text-charcoal-400">Genel</span>
+                        <span className="text-charcoal-400">{t('share.badge_public')}</span>
                       )}
                     </td>
                     <td className="py-3 px-4 text-xs text-charcoal-500 hidden lg:table-cell">
-                      {share.expires_at ? formatDate(share.expires_at) : 'Süresiz'}
+                      {share.expires_at ? formatDate(share.expires_at) : t('share.exp_unlimited')}
                     </td>
                     <td className="py-3 px-4 text-xs text-charcoal-600 hidden sm:table-cell">
-                      {share.view_count} kez
+                      {t('share.view_count_badge', { count: share.view_count })}
                     </td>
                     <td className="py-3 px-4">
                       <span
@@ -214,14 +214,14 @@ export const ShareManagement: React.FC = () => {
                             : 'bg-charcoal-100 text-charcoal-500'
                         }`}
                       >
-                        {share.enabled ? 'Aktif' : 'Devre Dışı'}
+                        {share.enabled ? t('share.active') : t('share.disabled')}
                       </span>
                       {share.burn_after_read && (
                         <span
                           className="ml-1.5 inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200"
-                          title="Bağlantı bir kez okununca paylaşım silinir; dosya silinmez"
+                          title={t('share.burn_description')}
                         >
-                          Tek okumalık
+                          {t('share.burn_badge')}
                         </span>
                       )}
                     </td>
@@ -240,18 +240,18 @@ export const ShareManagement: React.FC = () => {
                             type="button"
                             onClick={() => handleDisable(share)}
                             className="text-xs px-2.5 py-1 rounded-md border border-charcoal-200 text-charcoal-600 hover:bg-charcoal-100 font-medium transition-colors"
-                            title="Bağlantıyı Devre Dışı Bırak"
+                            title={t('share.disable_title')}
                           >
-                            Kapat
+                            {t('share.disable')}
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleEnable(share)}
                             className="text-xs px-2.5 py-1 rounded-md border border-accent/40 text-accent font-semibold hover:bg-accent/10 transition-colors"
-                            title="Bağlantıyı Yeniden Etkinleştir"
+                            title={t('share.enable_title')}
                           >
-                            Etkinleştir
+                            {t('share.enable')}
                           </button>
                         )}
                         <button
@@ -274,7 +274,7 @@ export const ShareManagement: React.FC = () => {
           {total > perPage && (
             <div className="flex items-center justify-between px-2 py-1 text-xs text-charcoal-600">
               <span>
-                Toplam {total} paylaşımdan {(page - 1) * perPage + 1} - {Math.min(page * perPage, total)} arası gösteriliyor
+                {t('share.pagination_summary', { total, start: (page - 1) * perPage + 1, end: Math.min(page * perPage, total) })}
               </span>
               <div className="flex items-center space-x-2">
                 <button
@@ -283,7 +283,7 @@ export const ShareManagement: React.FC = () => {
                   disabled={page <= 1 || loading}
                   className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
-                  Önceki
+                  {t('files.previous')}
                 </button>
                 <span className="font-semibold text-charcoal-800">
                   {page} / {totalPages}
@@ -294,7 +294,7 @@ export const ShareManagement: React.FC = () => {
                   disabled={page >= totalPages || loading}
                   className="px-2.5 py-1 bg-white border border-charcoal-200 rounded-md hover:bg-warm-100 disabled:opacity-40"
                 >
-                  Sonraki
+                  {t('files.next')}
                 </button>
               </div>
             </div>

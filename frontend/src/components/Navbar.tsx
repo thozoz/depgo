@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={onOpenMobileMenu}
             className="p-1.5 text-charcoal-600 hover:text-charcoal-900 rounded-lg hover:bg-charcoal-100 md:hidden"
-            aria-label="Menüyü aç"
+            aria-label={t('nav.open_menu')}
           >
             <MenuIcon className="w-5 h-5" />
           </button>
@@ -62,7 +62,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`px-1.5 py-0.5 rounded transition-all ${
               lang === 'tr' ? 'bg-white font-semibold text-charcoal-900 shadow-sm' : 'hover:text-charcoal-900'
             }`}
-            aria-label="Türkçe"
+            aria-label={t('nav.lang_tr')}
           >
             TR
           </button>
@@ -72,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className={`px-1.5 py-0.5 rounded transition-all ${
               lang === 'en' ? 'bg-white font-semibold text-charcoal-900 shadow-sm' : 'hover:text-charcoal-900'
             }`}
-            aria-label="English"
+            aria-label={t('nav.lang_en')}
           >
             EN
           </button>

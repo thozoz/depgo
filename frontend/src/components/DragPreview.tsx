@@ -5,6 +5,7 @@
 
 import { forwardRef } from 'react';
 import { FolderIcon, FileIcon } from './Icons';
+import { t } from '../utils/i18n';
 
 interface DragPreviewProps {
   names: string[];
@@ -30,7 +31,7 @@ export const DragPreview = forwardRef<HTMLDivElement, DragPreviewProps>(
           )}
         </div>
         <span className="truncate max-w-[180px]">
-          {isSingle ? names[0] : `${count} öğe`}
+          {isSingle ? names[0] : t('files.item_count', { count })}
         </span>
       </div>
     );

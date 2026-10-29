@@ -50,7 +50,7 @@ export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose,
       await onSubmit(item, trimmed);
       onClose();
     } catch (err: unknown) {
-      setError(describeError(err, 'Yeniden adlandırılamadı'));
+      setError(describeError(err, t('rename.failed')));
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ export const RenameModal: React.FC<RenameModalProps> = ({ isOpen, item, onClose,
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Yeniden Adlandır"
+      title={t('rename.title')}
       icon={<EditIcon className="w-5 h-5 text-accent" />}
     >
       <form onSubmit={handleSubmit} className="space-y-4">

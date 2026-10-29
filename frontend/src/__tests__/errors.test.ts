@@ -13,6 +13,11 @@ describe('describeError', () => {
     expect(describeError(new ApiError(200, 429, 'Too many unsuccessful sign-in attempts'), 'x')).toContain('Çok fazla');
   });
 
+  it('translates move conflicts (409 or file exists) into a localized conflict warning', () => {
+    expect(describeError(new ApiError(200, 409, 'conflict'), 'x')).toContain('409');
+    expect(describeError(new ApiError(200, 403, 'file [abc.txt] exists'), 'x')).toContain('409');
+  });
+
   it('keeps an unknown message instead of hiding it, and uses the fallback for non-errors', () => {
     expect(describeError(new ApiError(200, 500, 'disk is full'), 'x')).toBe('disk is full');
     expect(describeError(new Error('Önizleme çok büyük'), 'x')).toBe('Önizleme çok büyük');

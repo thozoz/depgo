@@ -91,7 +91,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
           )
         );
       } else {
-        const errorMsg = describeError(err, 'Yükleme başarısız');
+        const errorMsg = describeError(err, t('error.upload_failed'));
         setUploads((prev) =>
           prev.map((u, idx) => (idx === index ? { ...u, status: 'error', error: errorMsg } : u))
         );
@@ -131,7 +131,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Dosya Yükle"
+      title={t('upload.title')}
       icon={<UploadIcon className="w-5 h-5 text-accent" />}
       maxWidthClass="max-w-md"
     >
@@ -244,7 +244,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             disabled={isUploading}
             className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
           >
-            {allFinished ? 'Kapat' : t('common.cancel')}
+            {allFinished ? t('common.close') : t('common.cancel')}
           </button>
           {uploads.some((u) => u.status === 'pending') && (
             <button
@@ -253,7 +253,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               disabled={isUploading}
               className="px-4 py-2 text-sm font-semibold bg-accent hover:bg-accent-hover text-white rounded-lg shadow-xs transition-colors disabled:opacity-50"
             >
-              {isUploading ? t('upload.uploading') : 'Yüklemeyi Başlat'}
+              {isUploading ? t('upload.uploading') : t('files.upload_start')}
             </button>
           )}
         </div>

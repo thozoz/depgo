@@ -43,19 +43,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const content = (
     <div className="flex flex-col h-full bg-white border-r border-charcoal-200 w-60 select-none">
       <div className="flex items-center justify-between p-4 md:hidden border-b border-charcoal-100">
-        <span className="font-semibold text-charcoal-900 text-sm">Menü</span>
+        <span className="font-semibold text-charcoal-900 text-sm">{t('common.menu')}</span>
         <button
           type="button"
           onClick={onCloseMobile}
           className="p-1 text-charcoal-500 hover:text-charcoal-800 rounded-md"
-          aria-label="Kapat"
+          aria-label={t('common.close')}
         >
           <CloseIcon className="w-5 h-5" />
         </button>
       </div>
 
       {/* Navigation links - Nextcloud FilesNavigationList layout */}
-      <nav aria-label="Ana Menü" className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav aria-label={t('nav.main_menu')} className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
