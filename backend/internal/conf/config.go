@@ -36,6 +36,16 @@ type Scheme struct {
 	UnixFile     string `json:"unix_file" env:"UNIX_FILE"`
 	UnixFilePerm string `json:"unix_file_perm" env:"UNIX_FILE_PERM"`
 	EnableH2c    bool   `json:"enable_h2c" env:"ENABLE_H2C"`
+
+	// ReadHeaderTimeoutSeconds bounds how long a client may take to send the
+	// request headers. Without it a client that opens a connection and dribbles
+	// bytes forever holds a goroutine and a file descriptor indefinitely, which is
+	// all Slowloris needs. Only the header phase is bounded, so long uploads and
+	// downloads are unaffected.
+	ReadHeaderTimeoutSeconds int `json:"read_header_timeout_seconds" env:"READ_HEADER_TIMEOUT_SECONDS"`
+	// IdleTimeoutSeconds bounds how long an idle keep-alive connection is kept
+	// open between requests, so finished clients cannot pin resources either.
+	IdleTimeoutSeconds int `json:"idle_timeout_seconds" env:"IDLE_TIMEOUT_SECONDS"`
 }
 
 type LogConfig struct {
@@ -132,13 +142,15 @@ func DefaultConfig() *Config {
 	dbPath := filepath.Join(flags.DataDir, "data.db")
 	return &Config{
 		Scheme: Scheme{
-			Address:    "0.0.0.0",
-			UnixFile:   "",
-			HttpPort:   5244,
-			HttpsPort:  -1,
-			ForceHttps: false,
-			CertFile:   "",
-			KeyFile:    "",
+			Address:                  "0.0.0.0",
+			UnixFile:                 "",
+			HttpPort:                 5244,
+			HttpsPort:                -1,
+			ForceHttps:               false,
+			CertFile:                 "",
+			KeyFile:                  "",
+			ReadHeaderTimeoutSeconds: 20,
+			IdleTimeoutSeconds:       120,
 		},
 		JwtSecret:      random.String(16),
 		TokenExpiresIn: 48,
@@ -199,9 +211,15 @@ func DefaultConfig() *Config {
 			AllowRetryCanceled: false,
 		},
 		Cors: Cors{
-			AllowOrigins: []string{"*"},
-			AllowMethods: []string{"*"},
-			AllowHeaders: []string{"*"},
+			// The SPA is served from the same origin as the API, so no
+			// cross-origin access is required by default. An empty allow-list
+			// means "same-origin only": the CORS middleware then adds no
+			// Access-Control-* headers at all. Operators that need a separate
+			// front end list their origins explicitly instead of opening the
+			// API to every website on the internet.
+			AllowOrigins: []string{},
+			AllowMethods: []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowHeaders: []string{"Authorization", "Content-Type", "X-Share-Token", "Client-Id", "Accept", "Origin"},
 		},
 		S3: S3{
 			Enable: false,

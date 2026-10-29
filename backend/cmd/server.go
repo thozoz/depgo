@@ -23,6 +23,7 @@ import (
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/alist-org/alist/v3/server"
 	mcpserver "github.com/alist-org/alist/v3/server/mcp"
+	"github.com/alist-org/alist/v3/server/middlewares"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -50,7 +51,7 @@ the address is defined in config file`,
 			gin.SetMode(gin.ReleaseMode)
 		}
 		r := gin.New()
-		r.Use(gin.LoggerWithWriter(log.StandardLogger().Out), gin.RecoveryWithWriter(log.StandardLogger().Out))
+		r.Use(middlewares.RedactingLogger(log.StandardLogger().Out), gin.RecoveryWithWriter(log.StandardLogger().Out))
 		server.Init(r)
 		var httpHandler http.Handler = r
 		if conf.Conf.Scheme.EnableH2c {
@@ -60,7 +61,7 @@ the address is defined in config file`,
 		if conf.Conf.Scheme.HttpPort != -1 {
 			httpBase := fmt.Sprintf("%s:%d", conf.Conf.Scheme.Address, conf.Conf.Scheme.HttpPort)
 			utils.Log.Infof("start HTTP server @ %s", httpBase)
-			httpSrv = &http.Server{Addr: httpBase, Handler: httpHandler}
+			httpSrv = newHTTPServer(httpBase, httpHandler)
 			go func() {
 				err := httpSrv.ListenAndServe()
 				if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -71,7 +72,7 @@ the address is defined in config file`,
 		if conf.Conf.Scheme.HttpsPort != -1 {
 			httpsBase := fmt.Sprintf("%s:%d", conf.Conf.Scheme.Address, conf.Conf.Scheme.HttpsPort)
 			utils.Log.Infof("start HTTPS server @ %s", httpsBase)
-			httpsSrv = &http.Server{Addr: httpsBase, Handler: r}
+			httpsSrv = newHTTPServer(httpsBase, r)
 			go func() {
 				err := httpsSrv.ListenAndServeTLS(conf.Conf.Scheme.CertFile, conf.Conf.Scheme.KeyFile)
 				if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -81,7 +82,7 @@ the address is defined in config file`,
 		}
 		if conf.Conf.Scheme.UnixFile != "" {
 			utils.Log.Infof("start unix server @ %s", conf.Conf.Scheme.UnixFile)
-			unixSrv = &http.Server{Handler: httpHandler}
+			unixSrv = newHTTPServer("", httpHandler)
 			go func() {
 				listener, err := net.Listen("unix", conf.Conf.Scheme.UnixFile)
 				if err != nil {
@@ -105,18 +106,18 @@ the address is defined in config file`,
 		}
 		if conf.Conf.S3.Port != -1 && conf.Conf.S3.Enable {
 			s3r := gin.New()
-			s3r.Use(gin.LoggerWithWriter(log.StandardLogger().Out), gin.RecoveryWithWriter(log.StandardLogger().Out))
+			s3r.Use(middlewares.RedactingLogger(log.StandardLogger().Out), gin.RecoveryWithWriter(log.StandardLogger().Out))
 			server.InitS3(s3r)
 			s3Base := fmt.Sprintf("%s:%d", conf.Conf.Scheme.Address, conf.Conf.S3.Port)
 			utils.Log.Infof("start S3 server @ %s", s3Base)
 			go func() {
 				var err error
 				if conf.Conf.S3.SSL {
-					httpsSrv = &http.Server{Addr: s3Base, Handler: s3r}
+					httpsSrv = newHTTPServer(s3Base, s3r)
 					err = httpsSrv.ListenAndServeTLS(conf.Conf.Scheme.CertFile, conf.Conf.Scheme.KeyFile)
 				}
 				if !conf.Conf.S3.SSL {
-					httpSrv = &http.Server{Addr: s3Base, Handler: s3r}
+					httpSrv = newHTTPServer(s3Base, s3r)
 					err = httpSrv.ListenAndServe()
 				}
 				if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -165,7 +166,7 @@ the address is defined in config file`,
 			mcpHandler := mcpserver.NewHTTPHandler()
 			mcpBase := fmt.Sprintf("%s:%d", conf.Conf.Scheme.Address, conf.Conf.MCP.Port)
 			utils.Log.Infof("start MCP server @ %s", mcpBase)
-			mcpHttpSrv = &http.Server{Addr: mcpBase, Handler: mcpHandler}
+			mcpHttpSrv = newHTTPServer(mcpBase, mcpHandler)
 			go func() {
 				err := mcpHttpSrv.ListenAndServe()
 				if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -269,4 +270,37 @@ func OutAlistInit() {
 		args []string
 	)
 	ServerCmd.Run(cmd, args)
+}
+
+// newHTTPServer builds the HTTP server every listener uses, applying the
+// connection timeouts that keep a misbehaving client from pinning resources.
+//
+// Only the phases that cannot legitimately take a long time are bounded:
+//
+//   - ReadHeaderTimeout covers the request line and headers. A client that opens a
+//     connection and dribbles header bytes forever - the Slowloris pattern - holds
+//     a goroutine and a file descriptor per connection until the process runs out.
+//     Nothing legitimate needs minutes to send headers.
+//   - IdleTimeout covers an idle keep-alive connection between requests, so a
+//     finished client cannot squat on a connection slot.
+//
+// ReadTimeout and WriteTimeout are deliberately left unset. They cover the whole
+// request and response body, which is exactly the traffic this server exists to
+// move: a multi-hour upload or a large download would be cut off mid-stream.
+// Those are bounded by size limits and per-connection concurrency instead.
+func newHTTPServer(addr string, handler http.Handler) *http.Server {
+	readHeader := time.Duration(conf.Conf.Scheme.ReadHeaderTimeoutSeconds) * time.Second
+	if readHeader <= 0 {
+		readHeader = 20 * time.Second
+	}
+	idle := time.Duration(conf.Conf.Scheme.IdleTimeoutSeconds) * time.Second
+	if idle <= 0 {
+		idle = 120 * time.Second
+	}
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: readHeader,
+		IdleTimeout:       idle,
+	}
 }

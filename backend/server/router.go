@@ -26,6 +26,7 @@ func Init(e *gin.Engine) {
 		})
 	}
 	Cors(e)
+	e.Use(middlewares.SecurityHeaders())
 	e.Use(middlewares.SessionRefresh)
 	g := e.Group(urlPath)
 	if conf.Conf.Scheme.HttpPort != -1 && conf.Conf.Scheme.HttpsPort != -1 && conf.Conf.Scheme.ForceHttps {
@@ -74,9 +75,9 @@ func Init(e *gin.Engine) {
 	auth := api.Group("", middlewares.Auth)
 	webauthn := api.Group("/authn", middlewares.Authn)
 
-	api.POST("/auth/login", handles.Login)
-	api.POST("/auth/login/hash", handles.LoginHash)
-	api.POST("/auth/login/ldap", handles.LoginLdap)
+	api.POST("/auth/login", middlewares.NoStore(), handles.Login)
+	api.POST("/auth/login/hash", middlewares.NoStore(), handles.LoginHash)
+	api.POST("/auth/login/ldap", middlewares.NoStore(), handles.LoginLdap)
 	api.POST("/auth/register", func(c *gin.Context) {
 		common.ErrorStrResp(c, "registration is disabled", 403)
 	})
@@ -110,10 +111,13 @@ func Init(e *gin.Engine) {
 	public.Any("/settings", handles.PublicSettings)
 	public.Any("/offline_download_tools", handles.OfflineDownloadTools)
 	public.Any("/archive_extensions", handles.ArchiveExtensions)
-	public.GET("/share/info", handles.GetPublicShareInfo)
-	public.POST("/share/auth", handles.AuthPublicShare)
-	public.POST("/share/list", handles.ListPublicShare)
-	public.POST("/share/get", handles.GetPublicShare)
+	// Share responses carry or validate an access token, so they must never be
+	// cached by a proxy or the browser.
+	sharePublic := public.Group("", middlewares.NoStore())
+	sharePublic.GET("/share/info", handles.GetPublicShareInfo)
+	sharePublic.POST("/share/auth", handles.AuthPublicShare)
+	sharePublic.POST("/share/list", handles.ListPublicShare)
+	sharePublic.POST("/share/get", handles.GetPublicShare)
 
 	_fs(auth.Group("/fs", middlewares.AuthNotGuest))
 	share := auth.Group("/share", middlewares.AuthNotGuest)
@@ -281,9 +285,16 @@ func _labelFileBinding(g *gin.RouterGroup) {
 }
 
 func Cors(r *gin.Engine) {
+	origins := conf.Conf.Cors.AllowOrigins
+	if len(origins) == 0 {
+		// No cross-origin client is configured, so the API is same-origin only.
+		// Installing the middleware anyway would answer every foreign Origin
+		// with 403; omitting it leaves the browser's normal same-origin policy
+		// in charge and keeps the response free of CORS headers.
+		return
+	}
 	config := cors.DefaultConfig()
-	// config.AllowAllOrigins = true
-	config.AllowOrigins = conf.Conf.Cors.AllowOrigins
+	config.AllowOrigins = origins
 	config.AllowHeaders = conf.Conf.Cors.AllowHeaders
 	config.AllowMethods = conf.Conf.Cors.AllowMethods
 	r.Use(cors.New(config))
