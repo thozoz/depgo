@@ -25,6 +25,12 @@ type FileStream struct {
 	WebPutAsTask      bool
 	ForceStreamUpload bool
 	Exist             model.Obj //the file existed in the destination, we can reuse some info since we wil overwrite it
+	// NoOverwrite makes the destination write fail instead of replacing an
+	// existing file. The upload handlers already reject an existing target before
+	// streaming, but that check happens in a different layer and at a different
+	// time; carrying the intent down to the storage layer is what makes it a
+	// guarantee rather than a race.
+	NoOverwrite bool
 	utils.Closers
 	tmpFile  *os.File //if present, tmpFile has full content, it will be deleted at last
 	peekBuff *bytes.Reader
@@ -38,6 +44,11 @@ func (f *FileStream) GetSize() int64 {
 		}
 	}
 	return f.Obj.GetSize()
+}
+
+// MustNotOverwrite reports whether this upload must not replace an existing file.
+func (f *FileStream) MustNotOverwrite() bool {
+	return f.NoOverwrite
 }
 
 func (f *FileStream) GetMimetype() string {

@@ -386,6 +386,12 @@ func (s *Service) CrossRootRename(srcAbsPath, dstAbsPath string) error {
 	return s.crossRootRename(srcAbsPath, dstAbsPath, false)
 }
 
+// CrossRootRenameNoReplace is an alias for CrossRootRename, making the
+// atomic no-replace guarantee explicit at call sites.
+func (s *Service) CrossRootRenameNoReplace(srcAbsPath, dstAbsPath string) error {
+	return s.CrossRootRename(srcAbsPath, dstAbsPath)
+}
+
 // CrossRootRenameReplace is CrossRootRename with intentional replacement of an
 // existing destination. Only put-style writes (which snapshot the previous
 // content first) may use it.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/alist-org/alist/v3/internal/model"
@@ -172,9 +173,16 @@ func (s *Service) RestoreFromTrash(ctx context.Context, trashID string, customTa
 		return nil, fmt.Errorf("journal record failed before restore: %w", err)
 	}
 
-	// Move blob back from trash to destination
-	if err := s.CrossRootRename(item.BlobLocation, dstDiskPath); err != nil {
+	// Move blob back from trash to destination.
+	//
+	// No-replace, not plain move: the existence check above only observed one
+	// instant, and a plain rename would silently destroy whatever was created at
+	// that name in between. Restoring a file must never cost someone else's data.
+	if err := s.CrossRootRenameNoReplace(item.BlobLocation, dstDiskPath); err != nil {
 		_ = s.EndOperation(ctx, op.OpID, false)
+		if errors.Is(err, os.ErrExist) || errors.Is(err, syscall.EEXIST) {
+			return nil, fmt.Errorf("%w: cannot restore over existing path [%s]", ErrDestinationExists, normTarget)
+		}
 		return nil, fmt.Errorf("restore blob: %w", err)
 	}
 

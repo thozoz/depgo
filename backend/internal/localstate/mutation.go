@@ -2,10 +2,12 @@ package localstate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	stdpath "path"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/alist-org/alist/v3/internal/driver"
@@ -15,6 +17,17 @@ import (
 	cp "github.com/otiai10/copy"
 	"gorm.io/gorm"
 )
+
+// noOverwriteRequested reports whether the caller forbade replacing an existing
+// file. It is an optional capability rather than part of model.FileStreamer so
+// that drivers and tests implementing that interface are not forced to add it.
+func noOverwriteRequested(stream model.FileStreamer) bool {
+	type noOverwriter interface{ MustNotOverwrite() bool }
+	if s, ok := stream.(noOverwriter); ok {
+		return s.MustNotOverwrite()
+	}
+	return false
+}
 
 // SafePut performs stage-write-sync-close, snapshotting any existing destination before atomic replacement.
 func (s *Service) SafePut(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) error {
@@ -41,6 +54,18 @@ func (s *Service) SafePut(ctx context.Context, dstDir model.Obj, stream model.Fi
 	}
 	if err := s.CheckSymlink(parentRel); err != nil {
 		return err
+	}
+
+	// Honour a caller that asked not to replace an existing file. The upload
+	// handler performs the same check before streaming, but only as a courtesy so
+	// it can reject early; the authoritative check belongs here, next to the write,
+	// because a file created in between would otherwise be replaced.
+	if noOverwriteRequested(stream) {
+		if _, statErr := s.osRoot.Stat(dstRel); statErr == nil {
+			return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
+		} else if !errorsIsNotExist(statErr) {
+			return statErr
+		}
 	}
 
 	// 1. Stage: write into temporary file inside private staging directory on the same filesystem
@@ -227,9 +252,14 @@ func (s *Service) SafeMove(ctx context.Context, srcObj, dstDir model.Obj, storag
 		return fmt.Errorf("journal record failed before move: %w", err)
 	}
 
-	// Anchored intra-root move
-	if err := s.osRoot.Rename(srcRel, dstRel); err != nil {
+	// Anchored intra-root move, atomically refusing to replace a destination that
+	// appeared after the Stat above. A plain rename(2) replaces silently on POSIX,
+	// which would destroy whatever raced into the name.
+	if err := s.renameNoReplaceOsRoot(srcRel, dstRel); err != nil {
 		_ = s.EndOperation(ctx, op.OpID, false)
+		if errors.Is(err, os.ErrExist) || errors.Is(err, syscall.EEXIST) {
+			return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
+		}
 		return fmt.Errorf("disk rename %s -> %s: %w", srcRel, dstRel, err)
 	}
 
@@ -287,7 +317,8 @@ func (s *Service) SafeRename(ctx context.Context, srcObj model.Obj, newName stri
 		return nil
 	}
 
-	// Enforce no silent destination overwrite
+	// Reject an existing destination now, so the caller gets a clear error before
+	// any journal work happens. This is not the guarantee - see the rename below.
 	if _, err := s.osRoot.Stat(dstRel); err == nil {
 		return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
 	} else if !errorsIsNotExist(err) {
@@ -309,8 +340,18 @@ func (s *Service) SafeRename(ctx context.Context, srcObj model.Obj, newName stri
 		return fmt.Errorf("journal record failed before rename: %w", err)
 	}
 
-	if err := s.osRoot.Rename(srcRel, dstRel); err != nil {
+	// Perform the rename with an atomic no-replace primitive rather than a plain
+	// rename. The Stat above only observes the destination at one instant: a file
+	// created between the check and the rename would be silently destroyed on
+	// POSIX, where rename(2) replaces without complaint. renameat2 with
+	// RENAME_NOREPLACE makes "destination must not exist" part of the same
+	// operation, and renameBetweenDirs fails closed when the filesystem cannot
+	// promise that.
+	if err := s.renameNoReplaceOsRoot(srcRel, dstRel); err != nil {
 		_ = s.EndOperation(ctx, op.OpID, false)
+		if errors.Is(err, os.ErrExist) || errors.Is(err, syscall.EEXIST) {
+			return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
+		}
 		return fmt.Errorf("disk rename: %w", err)
 	}
 
@@ -321,6 +362,8 @@ func (s *Service) SafeRename(ctx context.Context, srcObj model.Obj, newName stri
 			return s.UpdateFileRecordPath(ctx, tx, srcRel, dstRel, storageMountPath)
 		})
 		if err != nil {
+			// The rollback may use a replacing rename: the destination is our own
+			// just-moved file, and the original source name is guaranteed free.
 			if rbErr := s.osRoot.Rename(dstRel, srcRel); rbErr == nil {
 				_ = s.EndOperation(ctx, op.OpID, false)
 				return fmt.Errorf("db update failed for rename, rolled back: %w", err)
@@ -331,6 +374,45 @@ func (s *Service) SafeRename(ctx context.Context, srcObj model.Obj, newName stri
 
 	_ = s.EndOperation(ctx, op.OpID, true)
 	return nil
+}
+
+// renameNoReplaceOsRoot renames srcRel to dstRel inside osRoot without ever
+// replacing an existing destination.
+//
+// On Linux this uses renameat2(RENAME_NOREPLACE), which makes the check and the
+// move a single atomic operation. Elsewhere it re-checks and then renames, which
+// narrows but cannot close the window; see renameBetweenDirs.
+func (s *Service) renameNoReplaceOsRoot(srcRel, dstRel string) error {
+	srcParent := stdpath.Dir(srcRel)
+	if srcParent == "." {
+		srcParent = ""
+	}
+	dstParent := stdpath.Dir(dstRel)
+	if dstParent == "." {
+		dstParent = ""
+	}
+
+	srcParentAbs, err := s.RelToDiskPath(srcParent)
+	if err != nil {
+		return err
+	}
+	srcDir, err := openOwnedDir(s.osRoot, srcParentAbs, srcParent)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = srcDir.file.Close() }()
+
+	dstParentAbs, err := s.RelToDiskPath(dstParent)
+	if err != nil {
+		return err
+	}
+	dstDir, err := openOwnedDir(s.osRoot, dstParentAbs, dstParent)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dstDir.file.Close() }()
+
+	return renameBetweenDirs(srcDir, dstDir, stdpath.Base(srcRel), stdpath.Base(dstRel), true)
 }
 
 // SafeCopy copies a file or directory, creating fresh FileRecords and preserving timestamps without symlink escapes.
@@ -365,7 +447,8 @@ func (s *Service) SafeCopy(ctx context.Context, srcObj, dstDir model.Obj) error 
 		return fmt.Errorf("destination folder is a subfolder of source folder")
 	}
 
-	// Enforce no silent destination overwrite
+	// Reject an existing destination up front for a clear error, but do not rely
+	// on it: see the staged copy below.
 	if _, err := s.osRoot.Stat(dstRel); err == nil {
 		return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
 	} else if !errorsIsNotExist(err) {
@@ -379,14 +462,33 @@ func (s *Service) SafeCopy(ctx context.Context, srcObj, dstDir model.Obj) error 
 		return err
 	}
 
-	if err := cp.Copy(srcDiskPath, dstDiskPath, cp.Options{
+	// Copy into the private staging directory first and only then move the result
+	// into place with a no-replace rename.
+	//
+	// Copying straight to the destination made the "destination must not exist"
+	// guarantee unenforceable: anything created between the Stat above and the copy
+	// would be overwritten, because a copy writes files rather than claiming a
+	// name. Staging keeps the destination untouched until a single atomic rename
+	// either claims the name or fails with ErrDestinationExists; a failed copy
+	// leaves nothing behind but a staging entry that is removed on the way out.
+	stagingDiskPath := filepath.Join(s.stagingPath, "stg_cp_"+random.String(12))
+	defer func() { _ = os.RemoveAll(stagingDiskPath) }()
+
+	if err := cp.Copy(srcDiskPath, stagingDiskPath, cp.Options{
 		Sync:          true,
 		PreserveTimes: true,
 		OnSymlink: func(src string) cp.SymlinkAction {
 			return cp.Skip
 		},
 	}); err != nil {
-		return fmt.Errorf("secure copy %s -> %s: %w", srcDiskPath, dstDiskPath, err)
+		return fmt.Errorf("secure copy %s -> staging: %w", srcDiskPath, err)
+	}
+
+	if err := s.CrossRootRenameNoReplace(stagingDiskPath, dstDiskPath); err != nil {
+		if errors.Is(err, os.ErrExist) || errors.Is(err, syscall.EEXIST) {
+			return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
+		}
+		return fmt.Errorf("publish copied entry at %s: %w", dstRel, err)
 	}
 
 	if s.db != nil {

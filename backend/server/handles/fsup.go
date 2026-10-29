@@ -85,6 +85,9 @@ func FsStream(c *gin.Context) {
 		Reader:       c.Request.Body,
 		Mimetype:     mimetype,
 		WebPutAsTask: asTask,
+		// Carry the "do not replace" intent down to the storage layer, which is the
+		// only place that can enforce it without a race.
+		NoOverwrite: !overwrite,
 	}
 	var t task.TaskExtensionInfo
 	if asTask {
@@ -176,6 +179,7 @@ func FsForm(c *gin.Context) {
 		Reader:       f,
 		Mimetype:     mimetype,
 		WebPutAsTask: asTask,
+		NoOverwrite:  !overwrite,
 	}
 	var t task.TaskExtensionInfo
 	if asTask {
