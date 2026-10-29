@@ -1,7 +1,10 @@
 package handles
 
 import (
+	"errors"
+	"math"
 	stdpath "path"
+	"strconv"
 	"time"
 
 	"github.com/alist-org/alist/v3/internal/db"
@@ -12,6 +15,30 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
+
+// shareAuthLimiter bounds online password guessing against public share links.
+// It is process-wide and intentionally not persisted: a restart clearing the
+// counters is an acceptable trade-off, while a full table of attempts in the
+// database would be a new abuse vector.
+var shareAuthLimiter = shareauth.NewAuthLimiter()
+
+// ConfigureShareAuthLimiter applies fn to the process-wide share authentication
+// limiter. It is the supported way to tune the guessing budget for a deployment
+// (for example to tighten the limits on an internet-facing instance) and to
+// skip the response penalty in tests.
+func ConfigureShareAuthLimiter(fn func(*shareauth.AuthLimiter)) {
+	if fn == nil {
+		return
+	}
+	fn(shareAuthLimiter)
+}
+
+// ResetShareAuthLimiter installs a fresh limiter, dropping every counter. It is
+// meant for tests that need isolated state; at runtime a restart is the natural
+// equivalent.
+func ResetShareAuthLimiter() {
+	shareAuthLimiter = shareauth.NewAuthLimiter()
+}
 
 // bindPublicShareReq keeps struct, field and validator details out of the
 // public response; they stay in the server log.
@@ -74,8 +101,19 @@ func AuthPublicShare(c *gin.Context) {
 	if !bindPublicShareReq(c, &req) {
 		return
 	}
+	// Bound online password guessing before touching the database. A locked key
+	// is answered with 429 and no hint about whether the share exists.
+	limitKey := shareAuthLimitKey(c, req.ShareID)
+	if blocked, wait := shareAuthLimiter.Blocked(limitKey, req.ShareID); blocked {
+		c.Header("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
+		common.ErrorStrResp(c, "too many failed password attempts, try again later", 429)
+		return
+	}
 	share, err := db.GetShareByShareID(req.ShareID)
 	if err != nil {
+		// Count unknown ids too, otherwise an attacker could enumerate share
+		// ids for free. The response stays identical to a wrong password.
+		shareAuthLimiter.Failure(limitKey, req.ShareID)
 		common.ErrorResp(c, err, 404)
 		return
 	}
@@ -83,9 +121,12 @@ func AuthPublicShare(c *gin.Context) {
 		return
 	}
 	if !sharePasswordMatched(share, req.Password) {
+		delay, _ := shareAuthLimiter.Failure(limitKey, req.ShareID)
+		shareAuthLimiter.ApplyDelay(delay)
 		common.ErrorStrResp(c, "password is incorrect", 403)
 		return
 	}
+	shareAuthLimiter.Success(limitKey)
 	token := ""
 	if share.HasPassword() {
 		ttl := shareAccessTokenLifetime
@@ -103,6 +144,13 @@ func AuthPublicShare(c *gin.Context) {
 	}
 	_ = db.TouchShareView(share.ShareID)
 	common.SuccessResp(c, gin.H{"token": token})
+}
+
+// shareAuthLimitKey identifies one guessing budget. The share id is part of the
+// key so that a lockout on one link never affects another, and the client IP is
+// part of it so that one source cannot spend the whole share-wide budget.
+func shareAuthLimitKey(c *gin.Context, shareID string) string {
+	return shareID + "|" + c.ClientIP()
 }
 
 func ListPublicShare(c *gin.Context) {
@@ -239,6 +287,10 @@ func ShareDown(c *gin.Context) {
 	if shouldTrackShareContentAccess(c) {
 		_ = db.TouchShareDownload(share.ShareID)
 		if err := recordShareAccess(share); err != nil {
+			if errors.Is(err, db.ErrShareConsumed) {
+				common.ErrorStrResp(c, "share has been consumed", 410)
+				return
+			}
 			common.ErrorResp(c, err, 500, true)
 			return
 		}
@@ -280,6 +332,10 @@ func ShareProxy(c *gin.Context) {
 	}
 	if shouldTrackShareContentAccess(c) {
 		if err := recordShareAccess(share); err != nil {
+			if errors.Is(err, db.ErrShareConsumed) {
+				common.ErrorStrResp(c, "share has been consumed", 410)
+				return
+			}
 			common.ErrorResp(c, err, 500, true)
 			return
 		}

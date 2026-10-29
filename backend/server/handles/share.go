@@ -303,14 +303,25 @@ func sharePasswordMatched(share *model.Share, password string) bool {
 	return subtle.ConstantTimeCompare([]byte(hash), []byte(share.PasswordHash)) == 1
 }
 
+// getShareAccessToken resolves the share access token for a request.
+//
+// The token is accepted from the request body, the X-Share-Token header, and —
+// for the paths that carry it in a URL because a browser loads them directly
+// (media, downloads) — from the "auth" query parameter.
+//
+// A query parameter ends up in browser history, Referer headers, proxy logs and
+// server access logs, which is why body/header delivery is preferred and why the
+// access log redacts the value. The query form is still required: <img> and
+// <video> elements cannot set headers, so removing it would break previews of
+// password-protected shares.
 func getShareAccessToken(c *gin.Context, fallback string) string {
 	if fallback != "" {
 		return fallback
 	}
-	if token := c.Query("auth"); token != "" {
+	if token := c.GetHeader("X-Share-Token"); token != "" {
 		return token
 	}
-	return c.GetHeader("X-Share-Token")
+	return c.Query("auth")
 }
 
 func ensureShareAvailable(c *gin.Context, share *model.Share) bool {
@@ -337,6 +348,13 @@ func ensureShareAvailable(c *gin.Context, share *model.Share) bool {
 	return true
 }
 
+// recordShareAccess claims one access slot for share and applies the updated
+// counters to the in-memory copy.
+//
+// It returns db.ErrShareConsumed when the budget was already spent, which lets
+// the caller refuse to serve the content. Reporting it through the error rather
+// than a boolean keeps the "spent the last access" case impossible to ignore
+// silently.
 func recordShareAccess(share *model.Share) error {
 	updated, err := db.RecordShareAccess(share.ShareID)
 	if err != nil {
@@ -385,12 +403,16 @@ func resolveShareTarget(share *model.Share, rawRelPath string) (string, string, 
 	return target, cleanRelPath, nil
 }
 
+// resolveShareWildcardTarget maps the wildcard segment of /sd and /sp onto a
+// path inside the share.
+//
+// The value must NOT be unescaped again: Gin hands over the path already decoded
+// by net/http, so a second decode turns a literal "%25" in a filename into "%"
+// and a literal "%2F" into a separator, serving a different file than the one
+// requested. The download routes avoid the same mistake in parsePath; keep the
+// two consistent.
 func resolveShareWildcardTarget(share *model.Share, rawPath string) (string, string, error) {
-	path, err := url.PathUnescape(rawPath)
-	if err != nil {
-		return "", "", err
-	}
-	return resolveShareTarget(share, strings.TrimPrefix(path, "/"))
+	return resolveShareTarget(share, strings.TrimPrefix(rawPath, "/"))
 }
 
 func buildPublicShareAssetURL(c *gin.Context, prefix, shareID, relPath, token string, preview bool) string {

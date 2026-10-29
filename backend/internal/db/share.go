@@ -1,12 +1,19 @@
 package db
 
 import (
+	"errors"
 	"time"
 
 	"github.com/alist-org/alist/v3/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// ErrShareConsumed reports that a share's access budget was already spent by the
+// time this request tried to claim its slot. Eligibility is checked before the
+// content is resolved, so without a check at claim time two concurrent requests
+// for a burn-after-read link both observe "one access left" and both are served.
+var ErrShareConsumed = errors.New("share has been consumed")
 
 func GetShareByShareID(shareID string) (*model.Share, error) {
 	var share model.Share
@@ -100,6 +107,14 @@ func RecordShareAccess(shareID string) (*model.Share, error) {
 			Where("share_id = ?", shareID).
 			Take(&updated).Error; err != nil {
 			return err
+		}
+
+		// Re-check the budget under the row lock. The caller already checked
+		// eligibility, but between that check and this write another request may
+		// have spent the last access; claiming a slot that no longer exists must
+		// fail rather than over-serve a burn-after-read link.
+		if updated.IsConsumed() {
+			return ErrShareConsumed
 		}
 
 		now := time.Now()
