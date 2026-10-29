@@ -25,7 +25,6 @@ var Cancel2FACmd = &cobra.Command{
 				utils.Log.Errorf("failed to cancel 2FA: %+v", err)
 			} else {
 				utils.Log.Info("2FA canceled")
-				DelAdminCacheOnline()
 			}
 		}
 	},

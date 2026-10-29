@@ -1,8 +1,6 @@
 package op
 
 import (
-	"time"
-
 	"github.com/Xhofe/go-cache"
 	"github.com/alist-org/alist/v3/internal/db"
 	"github.com/alist-org/alist/v3/internal/errs"
@@ -14,7 +12,6 @@ import (
 var userCache = cache.NewMemCache(cache.WithShards[*model.User](2))
 var userG singleflight.Group[*model.User]
 var guestUser *model.User
-var adminUser *model.User
 
 func enforceAdminUserDefaults(u *model.User) error {
 	if u == nil || !u.IsAdmin() {
@@ -35,24 +32,26 @@ func enforceAdminUserDefaults(u *model.User) error {
 	return db.UpdateUser(u)
 }
 
+// GetAdmin reads the administrator from the database on every call.
+//
+// It used to be cached for the life of the process. A password reset made with
+// the CLI runs in a separate process and can only reach the server's memory over
+// HTTP, so a running server kept authenticating the old password (and accepting
+// the old tokens) until it restarted. Depgo has one administrator and a local
+// SQLite file, so a point query per call is cheaper than that inconsistency.
 func GetAdmin() (*model.User, error) {
-	if adminUser == nil {
-		role, err := GetRoleByName("admin")
-		if err != nil {
-			return nil, err
-		}
-		user, err := db.GetUserByRole(int(role.ID))
-		if err != nil {
-			return nil, err
-		}
-		if err := enforceAdminUserDefaults(user); err != nil {
-			return nil, err
-		}
-		adminUser = user
-	} else if err := enforceAdminUserDefaults(adminUser); err != nil {
+	role, err := GetRoleByName("admin")
+	if err != nil {
 		return nil, err
 	}
-	return adminUser, nil
+	user, err := db.GetUserByRole(int(role.ID))
+	if err != nil {
+		return nil, err
+	}
+	if err := enforceAdminUserDefaults(user); err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func GetGuest() (*model.User, error) {
@@ -78,15 +77,11 @@ func GetUsersByRole(role int) ([]model.User, error) {
 	return db.GetUsersByRole(role)
 }
 
+// GetUserByName reads the user from the database; see GetAdmin for why there is
+// no cache here.
 func GetUserByName(username string) (*model.User, error) {
 	if username == "" {
 		return nil, errs.EmptyUsername
-	}
-	if user, ok := userCache.Get(username); ok {
-		if err := enforceAdminUserDefaults(user); err != nil {
-			return nil, err
-		}
-		return user, nil
 	}
 	user, err, _ := userG.Do(username, func() (*model.User, error) {
 		_user, err := db.GetUserByName(username)
@@ -96,7 +91,6 @@ func GetUserByName(username string) (*model.User, error) {
 		if err := enforceAdminUserDefaults(_user); err != nil {
 			return nil, err
 		}
-		userCache.Set(username, _user, cache.WithEx[*model.User](time.Hour))
 		return _user, nil
 	})
 	return user, err
@@ -133,9 +127,6 @@ func UpdateUser(u *model.User) error {
 	if err != nil {
 		return err
 	}
-	if u.IsAdmin() {
-		adminUser = nil
-	}
 	if u.IsGuest() {
 		guestUser = nil
 	}
@@ -148,7 +139,6 @@ func UpdateUser(u *model.User) error {
 func ClearUserCache() {
 	userCache.Clear()
 	guestUser = nil
-	adminUser = nil
 }
 
 func Cancel2FAByUser(u *model.User) error {
@@ -168,9 +158,6 @@ func DelUserCache(username string) error {
 	user, err := GetUserByName(username)
 	if err != nil {
 		return err
-	}
-	if user.IsAdmin() {
-		adminUser = nil
 	}
 	if user.IsGuest() {
 		guestUser = nil

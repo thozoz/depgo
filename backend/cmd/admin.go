@@ -80,7 +80,6 @@ func setAdminPassword(pwd string) {
 	utils.Log.Infof("admin user has been updated:")
 	utils.Log.Infof("username: %s", admin.Username)
 	utils.Log.Infof("password: %s", pwd)
-	DelAdminCacheOnline()
 }
 
 func init() {
