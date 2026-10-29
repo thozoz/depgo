@@ -21,6 +21,8 @@ import { TextEditorModal } from './components/TextEditorModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { GuestShareView } from './components/GuestShareView';
 import { LoginView } from './components/LoginView';
+import { SelectionBar } from './components/SelectionBar';
+import { ContextMenu, ContextMenuPosition } from './components/ContextMenu';
 import { RefreshIcon, SpinnerIcon, PlusIcon, UploadIcon, GridIcon, ListIcon } from './components/Icons';
 import { describeError } from './utils/errors';
 import { useTranslation } from './utils/i18n';
@@ -90,11 +92,17 @@ export const App: React.FC = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
   const [moveTarget, setMoveTarget] = useState<FileItem | null>(null);
+  const [batchMoveTargets, setBatchMoveTargets] = useState<FileItem[] | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
+  const [batchDeleteTargets, setBatchDeleteTargets] = useState<FileItem[] | null>(null);
   const [shareTarget, setShareTarget] = useState<FileItem | null>(null);
   const [previewTarget, setPreviewTarget] = useState<{ item: FileItem; rawUrl: string } | null>(null);
   const [textEditorTarget, setTextEditorTarget] = useState<{ filePath: string; fileName: string } | null>(null);
   const [versionHistoryTarget, setVersionHistoryTarget] = useState<{ filePath: string; fileName: string } | null>(null);
+
+  // Selection & Context Menu state
+  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null);
 
   // Fetch file list with explicit pagination
   const loadFiles = useCallback(
@@ -108,6 +116,7 @@ export const App: React.FC = () => {
         setHasMore(!!resp.has_more);
         setPage(targetPage);
         setCurrentDir(path);
+        setSelectedNames(new Set());
       } catch (err: unknown) {
         setError(describeError(err, 'Dosyalar yüklenemedi'));
       } finally {
@@ -197,14 +206,62 @@ export const App: React.FC = () => {
     await loadFiles(currentDir, page, true);
   };
 
-  const handleMoveSubmit = async (item: FileItem, targetDir: string) => {
-    await fsApi.move(currentDir, targetDir, [item.name]);
+  const handleMoveSubmit = async (targetItems: FileItem[], targetDir: string) => {
+    const names = targetItems.map((i) => i.name);
+    await fsApi.move(currentDir, targetDir, names);
     await loadFiles(currentDir, page, true);
   };
 
-  const handleDeleteConfirm = async (item: FileItem) => {
-    await fsApi.remove(currentDir, [item.name]);
+  const handleDeleteConfirm = async (targetItems: FileItem[]) => {
+    const names = targetItems.map((i) => i.name);
+    await fsApi.remove(currentDir, names);
     await loadFiles(currentDir, page, true);
+  };
+
+  // Selection handlers
+  const handleToggleSelect = (name: string) => {
+    setSelectedNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    setSelectedNames((prev) => {
+      if (prev.size === filteredItems.length && filteredItems.length > 0) {
+        return new Set();
+      }
+      return new Set(filteredItems.map((i) => i.name));
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedNames(new Set());
+  };
+
+  const selectedItems = useMemo(() => {
+    return items.filter((item) => selectedNames.has(item.name));
+  }, [items, selectedNames]);
+
+  const handleBatchDownload = async () => {
+    for (const item of selectedItems) {
+      if (!item.is_dir) {
+        await handleDownload(item);
+      }
+    }
+  };
+
+  const handleContextMenu = (item: FileItem, e: React.MouseEvent) => {
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      item,
+    });
   };
 
   const handleLogout = async () => {
@@ -303,6 +360,17 @@ export const App: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Nextcloud Selection Bar */}
+                {selectedItems.length > 0 && (
+                  <SelectionBar
+                    selectedItems={selectedItems}
+                    onClearSelection={handleClearSelection}
+                    onBatchDownload={handleBatchDownload}
+                    onBatchMove={() => setBatchMoveTargets(selectedItems)}
+                    onBatchDelete={() => setBatchDeleteTargets(selectedItems)}
+                  />
+                )}
+
                 {error && (
                   <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
                     {error}
@@ -317,6 +385,9 @@ export const App: React.FC = () => {
                 ) : viewMode === 'list' ? (
                   <FileList
                     items={filteredItems}
+                    selectedNames={selectedNames}
+                    onToggleSelect={handleToggleSelect}
+                    onToggleSelectAll={handleToggleSelectAll}
                     onOpenFolder={handleOpenFolder}
                     onPreview={handlePreview}
                     onEdit={handleEdit}
@@ -326,10 +397,13 @@ export const App: React.FC = () => {
                     onRename={(item) => setRenameTarget(item)}
                     onMove={(item) => setMoveTarget(item)}
                     onDelete={(item) => setDeleteTarget(item)}
+                    onContextMenu={handleContextMenu}
                   />
                 ) : (
                   <FileGrid
                     items={filteredItems}
+                    selectedNames={selectedNames}
+                    onToggleSelect={handleToggleSelect}
                     onOpenFolder={handleOpenFolder}
                     onPreview={handlePreview}
                     onEdit={handleEdit}
@@ -339,6 +413,7 @@ export const App: React.FC = () => {
                     onRename={(item) => setRenameTarget(item)}
                     onMove={(item) => setMoveTarget(item)}
                     onDelete={(item) => setDeleteTarget(item)}
+                    onContextMenu={handleContextMenu}
                   />
                 )}
 
@@ -404,18 +479,39 @@ export const App: React.FC = () => {
       />
 
       <MoveModal
-        isOpen={!!moveTarget}
+        isOpen={!!moveTarget || (!!batchMoveTargets && batchMoveTargets.length > 0)}
         item={moveTarget}
+        items={batchMoveTargets || (moveTarget ? [moveTarget] : [])}
         currentDir={currentDir}
-        onClose={() => setMoveTarget(null)}
+        onClose={() => {
+          setMoveTarget(null);
+          setBatchMoveTargets(null);
+        }}
         onSubmit={handleMoveSubmit}
       />
 
       <DeleteDialog
-        isOpen={!!deleteTarget}
+        isOpen={!!deleteTarget || (!!batchDeleteTargets && batchDeleteTargets.length > 0)}
         item={deleteTarget}
-        onClose={() => setDeleteTarget(null)}
+        items={batchDeleteTargets || (deleteTarget ? [deleteTarget] : [])}
+        onClose={() => {
+          setDeleteTarget(null);
+          setBatchDeleteTargets(null);
+        }}
         onConfirm={handleDeleteConfirm}
+      />
+
+      <ContextMenu
+        position={contextMenu}
+        onClose={() => setContextMenu(null)}
+        onPreview={handlePreview}
+        onEdit={handleEdit}
+        onVersions={handleVersions}
+        onDownload={handleDownload}
+        onShare={(item) => setShareTarget(item)}
+        onRename={(item) => setRenameTarget(item)}
+        onMove={(item) => setMoveTarget(item)}
+        onDelete={(item) => setDeleteTarget(item)}
       />
 
       <ShareModal

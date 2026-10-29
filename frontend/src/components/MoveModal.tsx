@@ -4,25 +4,31 @@ import { Modal } from './Modal';
 import { MoveIcon } from './Icons';
 import { joinPath } from '../utils/format';
 import { describeError } from '../utils/errors';
+import { useTranslation } from '../utils/i18n';
 
 interface MoveModalProps {
   isOpen: boolean;
   item: FileItem | null;
+  items?: FileItem[];
   currentDir: string;
   onClose: () => void;
-  onSubmit: (item: FileItem, targetDir: string) => Promise<void>;
+  onSubmit: (targetItems: FileItem[], targetDir: string) => Promise<void>;
 }
 
 export const MoveModal: React.FC<MoveModalProps> = ({
   isOpen,
   item,
+  items,
   currentDir,
   onClose,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const [targetDir, setTargetDir] = useState('/');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const targets = items && items.length > 0 ? items : item ? [item] : [];
 
   useEffect(() => {
     if (isOpen) {
@@ -32,7 +38,7 @@ export const MoveModal: React.FC<MoveModalProps> = ({
     }
   }, [isOpen, currentDir]);
 
-  if (!isOpen || !item) return null;
+  if (!isOpen || targets.length === 0) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,14 +52,17 @@ export const MoveModal: React.FC<MoveModalProps> = ({
     try {
       setLoading(true);
       setError(null);
-      await onSubmit(item, normalizedTarget);
+      await onSubmit(targets, normalizedTarget);
       onClose();
     } catch (err: unknown) {
-      setError(describeError(err, 'Taşıma işlemi başarısız'));
+      setError(describeError(err, t('files.move_error')));
     } finally {
       setLoading(false);
     }
   };
+
+  const isMultiple = targets.length > 1;
+  const single = targets[0];
 
   return (
     <Modal
@@ -62,46 +71,28 @@ export const MoveModal: React.FC<MoveModalProps> = ({
       title="Öğeyi Taşı"
       icon={<MoveIcon className="w-5 h-5 text-accent" />}
     >
-      <p className="text-sm text-charcoal-600 mb-4 truncate">
-        Taşınacak: <span className="font-semibold text-charcoal-900">{item.name}</span>
-      </p>
+      <div className="text-sm text-charcoal-600 mb-4 truncate">
+        Taşınacak:{' '}
+        <span className="font-semibold text-charcoal-900">
+          {isMultiple ? `${targets.length} öğe` : single.name}
+        </span>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="target-dir-input" className="block text-xs font-medium text-charcoal-700 mb-1">
+          <label htmlFor="target-dir" className="block text-xs font-medium text-charcoal-700 mb-1">
             Hedef Klasör Yolu
           </label>
           <input
-            id="target-dir-input"
+            id="target-dir"
             type="text"
             value={targetDir}
             onChange={(e) => setTargetDir(e.target.value)}
-            placeholder="/ veya /klasor-adi"
-            className="w-full px-3 py-2 border border-charcoal-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent font-mono text-xs"
             disabled={loading}
+            placeholder="/"
+            className="w-full px-3 py-2 text-sm border border-charcoal-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent"
           />
-          <div className="flex items-center space-x-2 mt-2">
-            <button
-              type="button"
-              onClick={() => setTargetDir('/')}
-              className="text-xs px-2 py-1 bg-charcoal-100 hover:bg-charcoal-200 rounded text-charcoal-700 transition-colors"
-            >
-              Kök Dizin (/)
-            </button>
-            {currentDir !== '/' && (
-              <button
-                type="button"
-                onClick={() => {
-                  const parts = currentDir.split('/').filter(Boolean);
-                  parts.pop();
-                  setTargetDir('/' + parts.join('/'));
-                }}
-                className="text-xs px-2 py-1 bg-charcoal-100 hover:bg-charcoal-200 rounded text-charcoal-700 transition-colors"
-              >
-                Üst Klasör (..)
-              </button>
-            )}
-          </div>
+          <p className="mt-1 text-xs text-charcoal-400">Örnek: /belgeler veya /</p>
         </div>
 
         {error && (
@@ -117,14 +108,14 @@ export const MoveModal: React.FC<MoveModalProps> = ({
             disabled={loading}
             className="px-3.5 py-2 text-sm font-medium text-charcoal-700 hover:bg-charcoal-100 rounded-lg transition-colors"
           >
-            İptal
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
-            disabled={loading || !targetDir.trim()}
+            disabled={loading}
             className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-hover text-white rounded-lg shadow-sm transition-colors disabled:opacity-50"
           >
-            {loading ? 'Taşınıyor...' : 'Taşı'}
+            {loading ? t('common.loading') : t('common.move')}
           </button>
         </div>
       </form>
