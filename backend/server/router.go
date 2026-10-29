@@ -92,6 +92,7 @@ func Init(e *gin.Engine) {
 	share.POST("/create", handles.CreateShare)
 	share.POST("/update", handles.UpdateShare)
 	share.POST("/disable", handles.DisableShare)
+	share.POST("/enable", handles.EnableShare)
 	share.GET("/list", handles.ListShares)
 	share.POST("/delete", handles.DeleteShare)
 	if flags.Debug || flags.Dev {

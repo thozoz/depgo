@@ -14,6 +14,7 @@ import (
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // shareAuthLimiter bounds online password guessing against public share links.
@@ -51,6 +52,22 @@ func bindPublicShareReq(c *gin.Context, req any) bool {
 	return true
 }
 
+// writeShareClaimError answers a failed attempt to claim an access slot.
+//
+// Not found means the row vanished between the availability check and the claim:
+// a self-destructing share was just read by a concurrent request, or the owner
+// deleted it. Either way the caller gets a clean 404, never a 500.
+func writeShareClaimError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, db.ErrShareConsumed):
+		common.ErrorStrResp(c, "share has been consumed", 410)
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		common.ErrorStrResp(c, "share not found", 404)
+	default:
+		common.ErrorResp(c, err, 500, true)
+	}
+}
+
 func GetPublicShareInfo(c *gin.Context) {
 	shareID := c.Query("share_id")
 	if shareID == "" {
@@ -77,7 +94,7 @@ func GetPublicShareInfo(c *gin.Context) {
 		ShareID:       share.ShareID,
 		IsDir:         share.IsDir,
 		HasPassword:   share.HasPassword(),
-		BurnAfterRead: share.EffectiveAccessLimit() == 1,
+		BurnAfterRead: share.BurnAfterRead,
 		AccessLimit:   share.EffectiveAccessLimit(),
 		AllowPreview:  share.AllowPreview,
 		AllowDownload: share.AllowDownload,
@@ -287,11 +304,7 @@ func ShareDown(c *gin.Context) {
 	if shouldTrackShareContentAccess(c) {
 		_ = db.TouchShareDownload(share.ShareID)
 		if err := recordShareAccess(share); err != nil {
-			if errors.Is(err, db.ErrShareConsumed) {
-				common.ErrorStrResp(c, "share has been consumed", 410)
-				return
-			}
-			common.ErrorResp(c, err, 500, true)
+			writeShareClaimError(c, err)
 			return
 		}
 	}
@@ -332,11 +345,7 @@ func ShareProxy(c *gin.Context) {
 	}
 	if shouldTrackShareContentAccess(c) {
 		if err := recordShareAccess(share); err != nil {
-			if errors.Is(err, db.ErrShareConsumed) {
-				common.ErrorStrResp(c, "share has been consumed", 410)
-				return
-			}
-			common.ErrorResp(c, err, 500, true)
+			writeShareClaimError(c, err)
 			return
 		}
 	}

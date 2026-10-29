@@ -14,6 +14,7 @@ import (
 	"github.com/alist-org/alist/v3/internal/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // createLimitedShare creates a share whose access budget is capped at limit and
@@ -91,10 +92,9 @@ func TestBurnAfterReadServesExactlyOneRecipient(t *testing.T) {
 	assert.Equal(t, 1, served,
 		"a burn-after-read share must serve exactly one recipient, served=%d/8 statuses=%v", served, statuses)
 
-	after, err := db.GetShareByShareID(shareID)
-	require.NoError(t, err)
-	assert.Equal(t, int64(1), after.AccessCount, "access_count must stop at the limit")
-	assert.True(t, after.IsConsumed(), "share must be consumed")
+	// "Delete after reading" removes the share record once it has been read.
+	_, err := db.GetShareByShareID(shareID)
+	assert.ErrorIs(t, err, gorm.ErrRecordNotFound, "a burn-after-read share must be deleted once read")
 }
 
 // TestAccessLimitIsEnforcedUnderConcurrency covers the non-burn variant: an

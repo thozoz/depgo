@@ -21,6 +21,7 @@ import (
 	"github.com/alist-org/alist/v3/pkg/utils/random"
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const shareAccessTokenLifetime = 24 * time.Hour
@@ -50,6 +51,8 @@ type UpdateShareReq struct {
 	NewShareID string `json:"new_share_id"`
 	Name       string `json:"name"`
 	Password   string `json:"password"`
+	// BurnAfterRead turns "delete the share once it has been read" on or off.
+	BurnAfterRead *bool `json:"burn_after_read"`
 	// RemovePassword drops password protection. An empty Password means "keep the
 	// current one", so removal needs its own explicit flag.
 	RemovePassword *bool   `json:"remove_password"`
@@ -165,7 +168,7 @@ func toShareResp(c *gin.Context, share *model.Share) ShareResp {
 		RootPath:          share.RootPath,
 		IsDir:             share.IsDir,
 		HasPassword:       share.HasPassword(),
-		BurnAfterRead:     accessLimit == 1,
+		BurnAfterRead:     share.BurnAfterRead,
 		AccessLimit:       accessLimit,
 		AccessCount:       share.AccessCount,
 		RemainingAccesses: share.RemainingAccesses(),
@@ -253,14 +256,18 @@ func resolveRequestedShareID(rawShareID, fallback string, excludeID uint) (strin
 	return shareID, nil
 }
 
+// normalizeShareAccessLimit resolves the access limit and the "delete after
+// reading" flag. The flag is its own switch: it forces the limit to one read, but
+// a plain access_limit of 1 only switches the share off once it is spent.
 func normalizeShareAccessLimit(accessLimit int64, burnAfterRead *bool) (int64, bool, error) {
 	if accessLimit < 0 {
 		return 0, false, fmt.Errorf("access_limit must be 0 or greater")
 	}
-	if accessLimit == 0 && burnAfterRead != nil && *burnAfterRead {
+	burn := burnAfterRead != nil && *burnAfterRead
+	if burn {
 		accessLimit = 1
 	}
-	return accessLimit, accessLimit == 1, nil
+	return accessLimit, burn, nil
 }
 
 func parseShareExpireAt(raw string) (*time.Time, error) {
@@ -577,9 +584,21 @@ func UpdateShare(c *gin.Context) {
 	}
 
 	accessLimit := share.EffectiveAccessLimit()
-	burnAfterRead := accessLimit == 1
-	if req.AccessLimit != nil {
-		accessLimit, burnAfterRead, err = normalizeShareAccessLimit(*req.AccessLimit, nil)
+	burnAfterRead := share.BurnAfterRead
+	if req.AccessLimit != nil || req.BurnAfterRead != nil {
+		limit := accessLimit
+		if req.AccessLimit != nil {
+			limit = *req.AccessLimit
+		} else if req.BurnAfterRead != nil && !*req.BurnAfterRead && share.BurnAfterRead {
+			// Switching the self-destruct off must not leave the single read it
+			// implied behind as a plain access limit.
+			limit = 0
+		}
+		burn := burnAfterRead
+		if req.BurnAfterRead != nil {
+			burn = *req.BurnAfterRead
+		}
+		accessLimit, burnAfterRead, err = normalizeShareAccessLimit(limit, &burn)
 		if err != nil {
 			common.ErrorResp(c, err, 400)
 			return
@@ -663,6 +682,27 @@ func DisableShare(c *gin.Context) {
 		return
 	}
 	common.SuccessResp(c)
+}
+
+// EnableShare re-opens a share that DisableShare closed. The slug never left the
+// share while it was off, so the link is the same one it always was.
+func EnableShare(c *gin.Context) {
+	var req ShareDeleteReq
+	if err := c.ShouldBind(&req); err != nil {
+		common.ErrorResp(c, err, 400)
+		return
+	}
+	user := c.MustGet("user").(*model.User)
+	share, err := db.EnableShare(user.ID, req.ShareID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			common.ErrorResp(c, err, 404)
+			return
+		}
+		common.ErrorResp(c, err, 500, true)
+		return
+	}
+	common.SuccessResp(c, toShareResp(c, share))
 }
 
 func DeleteShare(c *gin.Context) {

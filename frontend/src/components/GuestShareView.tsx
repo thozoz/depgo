@@ -228,6 +228,12 @@ export const GuestShareView: React.FC<GuestShareViewProps> = ({ shareId }) => {
 
       {/* Main Container */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-4">
+        {info?.burn_after_read && (
+          <div role="note" className="px-4 py-2.5 rounded-xl bg-yellow-50 border border-yellow-200 text-xs text-yellow-800">
+            Bu bağlantı tek okumalık: dosyayı önizlediğinizde veya indirdiğinizde paylaşım silinir ve bir daha açılamaz.
+          </div>
+        )}
+
         {/* Breadcrumbs (for folder share) */}
         {info?.is_dir && (
           <nav className="flex items-center space-x-1 text-sm bg-white border border-charcoal-200 rounded-xl px-4 py-2 overflow-x-auto">

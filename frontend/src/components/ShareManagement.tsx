@@ -55,11 +55,7 @@ export const ShareManagement: React.FC = () => {
   };
 
   const handleDisable = async (share: ShareResp) => {
-    if (!share.enabled) {
-      alert('Mevcut AList backend API sözleşmesinde kapatılmış bir paylaşımı yeniden açma (re-enable) endpoint\'i bulunmamaktadır. Yeniden paylaşmak için yeni bir bağlantı oluşturunuz.');
-      return;
-    }
-    if (!window.confirm(`"${share.name}" paylaşımını devre dışı bırakmak istediğinize emin misiniz? (AList backend'de kapatılan paylaşım yeniden açılamaz)`)) {
+    if (!window.confirm(`"${share.name}" bağlantısı kapatılsın mı? Bağlantı çalışmayı bırakır ama kaydı ve adresi kalır; istediğin zaman yeniden etkinleştirebilirsin.`)) {
       return;
     }
     try {
@@ -67,6 +63,20 @@ export const ShareManagement: React.FC = () => {
       fetchShares(page);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Paylaşım kapatılamadı');
+    }
+  };
+
+  const handleEnable = async (share: ShareResp) => {
+    // A link that ran out of reads starts a fresh budget when it is enabled again.
+    const spent = share.access_limit > 0 && share.remaining_accesses === 0;
+    if (spent && !window.confirm('Bu bağlantının erişim hakkı dolmuştu. Yeniden etkinleştirince hak sıfırlanır ve bağlantı tekrar okunabilir. Devam edilsin mi?')) {
+      return;
+    }
+    try {
+      await shareApi.enable(share.share_id);
+      fetchShares(page);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Paylaşım etkinleştirilemedi');
     }
   };
 
@@ -191,7 +201,7 @@ export const ShareManagement: React.FC = () => {
                     </td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-block whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${
                           share.enabled
                             ? 'bg-accent/15 text-accent-dark'
                             : 'bg-charcoal-100 text-charcoal-500'
@@ -199,6 +209,14 @@ export const ShareManagement: React.FC = () => {
                       >
                         {share.enabled ? 'Aktif' : 'Devre Dışı'}
                       </span>
+                      {share.burn_after_read && (
+                        <span
+                          className="ml-1.5 inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200"
+                          title="Bağlantı bir kez okununca paylaşım silinir; dosya silinmez"
+                        >
+                          Tek okumalık
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end space-x-1">
@@ -210,7 +228,7 @@ export const ShareManagement: React.FC = () => {
                         >
                           <EditIcon className="w-4 h-4" />
                         </button>
-                        {share.enabled && (
+                        {share.enabled ? (
                           <button
                             type="button"
                             onClick={() => handleDisable(share)}
@@ -218,6 +236,15 @@ export const ShareManagement: React.FC = () => {
                             title="Bağlantıyı Devre Dışı Bırak"
                           >
                             Kapat
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleEnable(share)}
+                            className="text-xs px-2 py-1 rounded border border-accent/40 text-accent-dark hover:bg-accent/10 transition-colors"
+                            title="Bağlantıyı Yeniden Etkinleştir"
+                          >
+                            Etkinleştir
                           </button>
                         )}
                         <button

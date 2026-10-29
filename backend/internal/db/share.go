@@ -80,6 +80,46 @@ func DisableShareByShareID(creatorID uint, shareID string) error {
 		}).Error
 }
 
+// EnableShare turns a disabled share back on and returns it.
+//
+// It runs under the row lock so it cannot interleave with RecordShareAccess, and
+// it always bumps access_revision: a token issued before the share was disabled
+// stays dead instead of coming back to life with the link.
+//
+// A share that was switched off because its access budget ran out (burn after
+// read, access_limit) would be disabled again by the very next request, so the
+// owner enabling it again starts a fresh budget: the counter resets and the
+// consumed marker is cleared. Enabling a share that is already on is a no-op.
+func EnableShare(creatorID uint, shareID string) (*model.Share, error) {
+	var share model.Share
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("creator_id = ? AND share_id = ?", creatorID, shareID).
+			Take(&share).Error; err != nil {
+			return err
+		}
+		if share.Enabled && !share.IsConsumed() {
+			return nil
+		}
+		updates := map[string]interface{}{
+			"enabled":         true,
+			"access_revision": gorm.Expr("access_revision + 1"),
+		}
+		if share.IsConsumed() {
+			updates["access_count"] = 0
+			updates["consumed_at"] = nil
+		}
+		if err := tx.Model(&model.Share{}).Where("id = ?", share.ID).Updates(updates).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", share.ID).Take(&share).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &share, nil
+}
+
 func TouchShareView(shareID string) error {
 	now := time.Now()
 	return db.Model(&model.Share{}).
@@ -126,6 +166,14 @@ func RecordShareAccess(shareID string) (*model.Share, error) {
 		}
 
 		limit := updated.EffectiveAccessLimit()
+		if limit > 0 && updated.AccessCount >= limit && updated.BurnAfterRead {
+			// "Delete after reading": the owner opted into a self-destructing link,
+			// so the share record goes now. The file itself is untouched. The copy
+			// returned below still lets this one request be served.
+			updated.Enabled = false
+			updated.ConsumedAt = &now
+			return tx.Delete(&model.Share{}, updated.ID).Error
+		}
 		if limit > 0 && updated.AccessCount >= limit {
 			updated.Enabled = false
 			updated.ConsumedAt = &now

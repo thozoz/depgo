@@ -276,4 +276,69 @@ test.describe.serial('Depgo real browser lifecycle', () => {
       await guest.close();
     }
   });
+
+  test('delete-after-reading share survives opening the page, disappears after one preview and keeps the file', async ({ page, browser }) => {
+    await row(page, 'picture.png').getByTitle('Paylaş', { exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Paylaşım Bağlantısı Oluştur', exact: true });
+    const slug = `burn-${run}`;
+    shareIds.add(slug);
+    await dialog.getByLabel('Özel Bağlantı Adı (Slug)').fill(slug);
+    await dialog.getByLabel('Okunduktan sonra bu paylaşımı sil').check();
+    await dialog.getByRole('button', { name: 'Paylaşım Oluştur', exact: true }).click();
+    await expect(dialog.getByText('Paylaşım Bağlantınız Hazır')).toBeVisible();
+    await dialog.getByLabel('Kapat', { exact: true }).click();
+
+    const guest = await browser.newContext({ baseURL: process.env.DEPGO_BASE_URL || 'http://localhost:15244' });
+    try {
+      const guestPage = await guest.newPage();
+      await guestPage.goto(`/s/${slug}`);
+      await expect(guestPage.getByRole('note')).toContainText('tek okumalık');
+      // Opening the page is not a read.
+      expect((await (await guest.request.get(`/api/public/share/info?share_id=${slug}`)).json()).code).toBe(200);
+
+      await guestPage.getByTitle('Önizle', { exact: true }).click();
+      const image = guestPage.getByRole('dialog', { name: 'picture.png' }).locator('img');
+      await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBe(400);
+      await screenshot(guestPage, 'guest-burn');
+
+      // The preview was the read: the share is gone, the file is not.
+      expect((await (await guest.request.get(`/api/public/share/info?share_id=${slug}`)).json()).code).toBe(404);
+      const listed = await call('/api/share/list?page=1&per_page=100', undefined, 'GET');
+      expect(JSON.stringify(listed)).not.toContain(`"share_id":"${slug}"`);
+    } finally {
+      await guest.close();
+    }
+    await expect(row(page, 'picture.png')).toBeVisible();
+  });
+
+  test('a disabled share keeps its slug, refuses reuse with the same error and can be enabled again', async ({ page, browser }) => {
+    const slug = `off-${run}`;
+    shareIds.add(slug);
+    await call('/api/share/create', { path: `${root}/picture.png`, share_id: slug });
+    await call('/api/share/disable', { share_id: slug });
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const again = await api.post('/api/share/create', {
+        headers: { Authorization: token }, data: { path: `${root}/document.txt`, share_id: slug },
+      });
+      const body = await again.json();
+      expect([body.code, body.message]).toEqual([400, 'share link already exists']);
+    }
+
+    const guest = await browser.newContext({ baseURL: process.env.DEPGO_BASE_URL || 'http://localhost:15244' });
+    try {
+      expect((await (await guest.request.get(`/api/public/share/info?share_id=${slug}`)).json()).code).toBe(404);
+
+      await page.getByRole('button', { name: 'Paylaşımlar' }).click();
+      const shareRow = page.getByRole('row').filter({ hasText: `/s/${slug}` });
+      await expect(shareRow.getByText('Devre Dışı', { exact: true })).toBeVisible();
+      await screenshot(page, 'share-disabled');
+      await shareRow.getByRole('button', { name: 'Etkinleştir' }).click();
+      await expect(shareRow.getByText('Aktif', { exact: true })).toBeVisible();
+
+      expect((await (await guest.request.get(`/api/public/share/info?share_id=${slug}`)).json()).code).toBe(200);
+    } finally {
+      await guest.close();
+    }
+  });
 });

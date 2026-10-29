@@ -467,6 +467,13 @@ export const shareApi = {
     });
   },
 
+  async enable(shareId: string): Promise<ShareResp> {
+    return request<ShareResp>('/api/share/enable', {
+      method: 'POST',
+      body: JSON.stringify({ share_id: shareId }),
+    });
+  },
+
   async delete(shareId: string): Promise<void> {
     return request<void>('/api/share/delete', {
       method: 'POST',

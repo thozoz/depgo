@@ -27,6 +27,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [expireHours, setExpireHours] = useState<number>(0);
   const [allowPreview, setAllowPreview] = useState(true);
   const [allowDownload, setAllowDownload] = useState(true);
+  const [burnAfterRead, setBurnAfterRead] = useState(false);
   const [createdShare, setCreatedShare] = useState<ShareResp | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,6 +46,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         setPassword('');
         setAllowPreview(existingShare.allow_preview);
         setAllowDownload(existingShare.allow_download);
+        setBurnAfterRead(existingShare.burn_after_read);
       } else if (item) {
         setCreatedShare(null);
         // Default slug from name
@@ -59,6 +61,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         setExpireHours(0);
         setAllowPreview(true);
         setAllowDownload(true);
+        setBurnAfterRead(false);
       }
     }
   }, [isOpen, item, existingShare]);
@@ -86,6 +89,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           remove_password: removePassword || undefined,
           allow_preview: allowPreview,
           allow_download: allowDownload,
+          burn_after_read: burnAfterRead,
         });
       } else {
         const fullItemPath = item!.virtual_path || item!.path || item!.name;
@@ -97,6 +101,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           expire_hours: expireHours > 0 ? expireHours : undefined,
           allow_preview: allowPreview,
           allow_download: allowDownload,
+          burn_after_read: burnAfterRead || undefined,
         });
       }
 
@@ -268,6 +273,22 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               className="rounded text-accent focus:ring-accent"
             />
             <span>İndirmeye izin ver</span>
+          </label>
+
+          <label className="flex items-start space-x-2 text-xs text-charcoal-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={burnAfterRead}
+              onChange={(e) => setBurnAfterRead(e.target.checked)}
+              disabled={loading}
+              className="mt-0.5 rounded text-accent focus:ring-accent"
+            />
+            <span>
+              Okunduktan sonra bu paylaşımı sil
+              <span className="block text-charcoal-500">
+                Bağlantı bir kez açılıp içeriği alınınca paylaşım silinir. Dosyanın kendisi silinmez.
+              </span>
+            </span>
           </label>
         </div>
 

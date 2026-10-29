@@ -95,6 +95,7 @@ export interface UpdateShareReq {
   name?: string;
   password?: string;
   remove_password?: boolean;
+  burn_after_read?: boolean;
   expire_at?: string | null;
   access_limit?: number;
   allow_preview?: boolean;
