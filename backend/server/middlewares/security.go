@@ -56,8 +56,9 @@ func SecurityHeaders() gin.HandlerFunc {
 // module files only. connect-src stays 'self' because every API call is
 // same-origin. img/media allow data: and blob: for in-browser previews.
 //
-// object-src and frame-src allow blob: because the built-in PDF reader renders a
-// fetched PDF through <object data="blob:...">; 'none' would blank it.
+// object-src, frame-src and connect-src allow blob: because the built-in PDF
+// reader renders a fetched PDF through <object data="blob:..."> (object-src
+// 'none' would blank it) and a viewer may read that same-origin blob back.
 //
 // A deployment that injects custom markup through "customize head/body" may load
 // third-party scripts the policy cannot know about. Rather than silently
@@ -68,7 +69,7 @@ func contentSecurityPolicy() string {
 		return "default-src 'self'; script-src 'self' 'unsafe-inline' https:; " +
 			"style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; " +
 			"media-src 'self' data: blob: https:; font-src 'self' data: https:; " +
-			"connect-src 'self' https:; frame-src 'self' blob: https:; object-src 'self' blob:; " +
+			"connect-src 'self' blob: https:; frame-src 'self' blob: https:; object-src 'self' blob:; " +
 			"base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 	}
 	return strictContentSecurityPolicy()
@@ -84,7 +85,7 @@ func strictContentSecurityPolicy() string {
 		"img-src 'self' data: blob:",
 		"media-src 'self' data: blob:",
 		"font-src 'self' data:",
-		"connect-src 'self'",
+		"connect-src 'self' blob:",
 		"worker-src 'self' blob:",
 		"frame-src 'self' blob:",
 		"object-src 'self' blob:",

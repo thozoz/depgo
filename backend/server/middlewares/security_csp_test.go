@@ -10,7 +10,7 @@ import (
 // for objects and frames while still refusing remote plugins.
 func TestContentSecurityPolicyKeepsPdfReaderWorking(t *testing.T) {
 	csp := strictContentSecurityPolicy()
-	for _, want := range []string{"object-src 'self' blob:", "frame-src 'self' blob:", "script-src 'self'", "frame-ancestors 'none'"} {
+	for _, want := range []string{"object-src 'self' blob:", "frame-src 'self' blob:", "connect-src 'self' blob:", "script-src 'self'", "frame-ancestors 'none'"} {
 		if !strings.Contains(csp, want) {
 			t.Fatalf("CSP %q is missing %q", csp, want)
 		}
