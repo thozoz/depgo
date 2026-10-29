@@ -1,11 +1,15 @@
+/**
+ * SPDX-FileCopyrightText: 2026 Depgo contributors, inspired by Nextcloud Files (FilesNavigationList.vue)
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 import React from 'react';
-import { FolderIcon, ShareIcon, PlusIcon, UploadIcon, CloseIcon, TrashIcon } from './Icons';
+import { FolderIcon, ShareIcon, TrashIcon, CloseIcon } from './Icons';
+import { useTranslation } from '../utils/i18n';
 
 interface SidebarProps {
   activeTab: 'files' | 'shares' | 'trash';
   onSelectTab: (tab: 'files' | 'shares' | 'trash') => void;
-  onNewFolder: () => void;
-  onUpload: () => void;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
 }
@@ -13,108 +17,77 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
-  onNewFolder,
-  onUpload,
   isOpenMobile,
   onCloseMobile,
 }) => {
+  const { t } = useTranslation();
+
+  const navItems = [
+    {
+      id: 'files' as const,
+      name: t('nav.files'),
+      icon: FolderIcon,
+    },
+    {
+      id: 'shares' as const,
+      name: t('nav.shares'),
+      icon: ShareIcon,
+    },
+    {
+      id: 'trash' as const,
+      name: t('nav.trash'),
+      icon: TrashIcon,
+    },
+  ];
+
   const content = (
-    <div className="flex flex-col h-full bg-white border-r border-charcoal-200 w-60 p-3 select-none">
-      <div className="flex items-center justify-between pb-3 md:hidden">
-        <span className="font-semibold text-charcoal-900">Menü</span>
+    <div className="flex flex-col h-full bg-white border-r border-charcoal-200 w-60 select-none">
+      <div className="flex items-center justify-between p-4 md:hidden border-b border-charcoal-100">
+        <span className="font-semibold text-charcoal-900 text-sm">Menü</span>
         <button
           type="button"
           onClick={onCloseMobile}
-          className="p-1 text-charcoal-500 hover:text-charcoal-800 rounded"
+          className="p-1 text-charcoal-500 hover:text-charcoal-800 rounded-md"
           aria-label="Kapat"
         >
           <CloseIcon className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Action buttons */}
-      <div className="space-y-2 mb-4">
-        <button
-          type="button"
-          onClick={() => {
-            onUpload();
-            onCloseMobile();
-          }}
-          className="w-full flex items-center justify-center space-x-2 py-2 px-3 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg shadow-sm transition-colors"
-        >
-          <UploadIcon className="w-4 h-4" />
-          <span>Dosya Yükle</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            onNewFolder();
-            onCloseMobile();
-          }}
-          className="w-full flex items-center justify-center space-x-2 py-2 px-3 bg-warm-100 hover:bg-warm-200 text-charcoal-800 border border-charcoal-200 text-sm font-medium rounded-lg transition-colors"
-        >
-          <PlusIcon className="w-4 h-4 text-charcoal-600" />
-          <span>Yeni Klasör</span>
-        </button>
-      </div>
-
-      {/* Navigation links */}
-      <nav className="flex-1 space-y-1">
-        <button
-          type="button"
-          onClick={() => {
-            onSelectTab('files');
-            onCloseMobile();
-          }}
-          className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'files'
-              ? 'bg-accent/10 text-accent font-semibold'
-              : 'text-charcoal-700 hover:bg-charcoal-100 hover:text-charcoal-900'
-          }`}
-        >
-          <FolderIcon className={`w-4 h-4 ${activeTab === 'files' ? 'text-accent' : 'text-charcoal-500'}`} />
-          <span>Dosyalar</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            onSelectTab('shares');
-            onCloseMobile();
-          }}
-          className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'shares'
-              ? 'bg-accent/10 text-accent font-semibold'
-              : 'text-charcoal-700 hover:bg-charcoal-100 hover:text-charcoal-900'
-          }`}
-        >
-          <ShareIcon className={`w-4 h-4 ${activeTab === 'shares' ? 'text-accent' : 'text-charcoal-500'}`} />
-          <span>Paylaşımlar</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            onSelectTab('trash');
-            onCloseMobile();
-          }}
-          className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-            activeTab === 'trash'
-              ? 'bg-accent/10 text-accent font-semibold'
-              : 'text-charcoal-700 hover:bg-charcoal-100 hover:text-charcoal-900'
-          }`}
-        >
-          <TrashIcon className={`w-4 h-4 ${activeTab === 'trash' ? 'text-accent' : 'text-charcoal-500'}`} />
-          <span>Çöp Kutusu</span>
-        </button>
+      {/* Navigation links - Nextcloud FilesNavigationList layout */}
+      <nav aria-label="Ana Menü" className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                onSelectTab(item.id);
+                onCloseMobile();
+              }}
+              className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                isActive
+                  ? 'bg-accent/10 text-accent font-semibold border-l-4 border-accent rounded-l-none'
+                  : 'text-charcoal-700 hover:bg-charcoal-50 hover:text-charcoal-900'
+              }`}
+            >
+              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-accent' : 'text-charcoal-500'}`} />
+              <span className="truncate">{item.name}</span>
+            </button>
+          );
+        })}
       </nav>
 
-      {/* Footer info */}
-      <div className="pt-3 border-t border-charcoal-200 text-xs text-charcoal-400">
-        <div className="flex items-center justify-between">
-          <span>Depgo Yerel Depolama</span>
-          <span className="w-2 h-2 rounded-full bg-accent" title="Aktif" />
+      {/* Footer quota - Nextcloud NavigationQuota style */}
+      <div className="p-4 border-t border-charcoal-200 text-xs text-charcoal-500">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="font-medium text-charcoal-700">{t('nav.storage_quota')}</span>
+          <span className="text-[11px] text-accent font-medium">Depgo Local</span>
+        </div>
+        <div className="w-full bg-charcoal-100 h-1.5 rounded-full overflow-hidden">
+          <div className="bg-accent h-full rounded-full w-1/4" />
         </div>
       </div>
     </div>
@@ -123,7 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden md:block flex-shrink-0">
+      <aside className="hidden md:block flex-shrink-0 h-full">
         {content}
       </aside>
 

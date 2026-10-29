@@ -66,4 +66,6 @@ Version history is not a backup. The database, version area, and trash area must
 
 The backend is derived from [AList](https://github.com/alist-org/alist). The AGPL-3.0 text is in `LICENSE`; provenance and attribution are described in `NOTICE`. Upstream copyright notices are preserved.
 
+The frontend user interface layout, dimensions, and interaction patterns are inspired by [Nextcloud Files](https://github.com/nextcloud/server/tree/master/apps/files) (Nextcloud GmbH and contributors, AGPL-3.0). Components are clean React implementations adhering to Depgo's standalone architecture.
+
 Depgo sources: <https://github.com/thozoz/depgo>. If you distribute a modified version or serve it over a network, keep the corresponding source available under the AGPL terms.

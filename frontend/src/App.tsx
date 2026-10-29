@@ -21,10 +21,12 @@ import { TextEditorModal } from './components/TextEditorModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { GuestShareView } from './components/GuestShareView';
 import { LoginView } from './components/LoginView';
-import { RefreshIcon, SpinnerIcon } from './components/Icons';
+import { RefreshIcon, SpinnerIcon, PlusIcon, UploadIcon, GridIcon, ListIcon } from './components/Icons';
 import { describeError } from './utils/errors';
+import { useTranslation } from './utils/i18n';
 
 export const App: React.FC = () => {
+  const { t } = useTranslation();
   // Check if current URL is a guest share (/s/:share_id)
   const [currentUrlPath, setCurrentUrlPath] = useState(window.location.pathname);
 
@@ -240,8 +242,6 @@ export const App: React.FC = () => {
             setActiveTab(tab);
             setFilterQuery('');
           }}
-          onNewFolder={() => setNewFolderOpen(true)}
-          onUpload={() => setUploadOpen(true)}
           isOpenMobile={mobileMenuOpen}
           onCloseMobile={() => setMobileMenuOpen(false)}
         />
@@ -250,18 +250,53 @@ export const App: React.FC = () => {
           <div className="max-w-7xl mx-auto space-y-4">
             {activeTab === 'files' ? (
               <>
-                {/* Control bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-2.5">
-                  <Breadcrumbs currentPath={currentDir} onNavigate={handleNavigateBreadcrumb} />
+                {/* Nextcloud Files: Breadcrumbs and Toolbar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white border border-charcoal-200 rounded-xl px-4 py-2.5 shadow-xs">
+                  <div className="min-w-0 flex-1">
+                    <Breadcrumbs currentPath={currentDir} onNavigate={handleNavigateBreadcrumb} />
+                  </div>
 
-                  <div className="flex items-center space-x-2 w-full min-w-0 sm:w-auto">
+                  <div className="flex items-center flex-wrap gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setNewFolderOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-warm-100 hover:bg-warm-200 text-charcoal-800 border border-charcoal-200 text-xs font-semibold rounded-lg transition-colors"
+                      title={t('files.new_folder')}
+                    >
+                      <PlusIcon className="w-4 h-4 text-charcoal-600" />
+                      <span>{t('files.new_folder')}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setUploadOpen(true)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+                      title={t('files.upload')}
+                    >
+                      <UploadIcon className="w-4 h-4" />
+                      <span>{t('files.upload')}</span>
+                    </button>
+
+                    <div className="h-5 w-px bg-charcoal-200 mx-0.5 hidden sm:block" />
+
+                    <button
+                      type="button"
+                      onClick={() => setViewMode((prev) => (prev === 'list' ? 'grid' : 'list'))}
+                      className="p-1.5 text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-lg transition-colors"
+                      title={viewMode === 'list' ? t('nav.view_grid') : t('nav.view_list')}
+                      aria-label={viewMode === 'list' ? t('nav.view_grid') : t('nav.view_list')}
+                    >
+                      {viewMode === 'list' ? <GridIcon className="w-4 h-4" /> : <ListIcon className="w-4 h-4" />}
+                    </button>
+
                     <FilterInput value={filterQuery} onChange={setFilterQuery} />
+
                     <button
                       type="button"
                       onClick={() => loadFiles(currentDir, page, true)}
                       disabled={loading}
-                      className="p-2 text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-lg transition-colors flex-shrink-0"
-                      title="Yenile"
+                      className="p-1.5 text-charcoal-600 hover:text-charcoal-900 hover:bg-charcoal-100 rounded-lg transition-colors flex-shrink-0"
+                      title={t('common.refresh')}
                     >
                       <RefreshIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     </button>
