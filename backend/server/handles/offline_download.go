@@ -27,11 +27,11 @@ func SetAria2(c *gin.Context) {
 		common.ErrorResp(c, err, 400)
 		return
 	}
-	items := []model.SettingItem{
-		{Key: conf.Aria2Uri, Value: req.Uri, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
-		{Key: conf.Aria2Secret, Value: req.Secret, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.Aria2Uri:    req.Uri,
+		conf.Aria2Secret: req.Secret,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -59,11 +59,11 @@ func SetQbittorrent(c *gin.Context) {
 		common.ErrorResp(c, err, 400)
 		return
 	}
-	items := []model.SettingItem{
-		{Key: conf.QbittorrentUrl, Value: req.Url, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
-		{Key: conf.QbittorrentSeedtime, Value: req.Seedtime, Type: conf.TypeNumber, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.QbittorrentUrl:      req.Url,
+		conf.QbittorrentSeedtime: req.Seedtime,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -90,11 +90,11 @@ func SetTransmission(c *gin.Context) {
 		common.ErrorResp(c, err, 400)
 		return
 	}
-	items := []model.SettingItem{
-		{Key: conf.TransmissionUri, Value: req.Uri, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
-		{Key: conf.TransmissionSeedtime, Value: req.Seedtime, Type: conf.TypeNumber, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.TransmissionUri:      req.Uri,
+		conf.TransmissionSeedtime: req.Seedtime,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -135,10 +135,10 @@ func Set115(c *gin.Context) {
 			return
 		}
 	}
-	items := []model.SettingItem{
-		{Key: conf.Pan115TempDir, Value: req.TempDir, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.Pan115TempDir: req.TempDir,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -179,10 +179,10 @@ func SetPikPak(c *gin.Context) {
 			return
 		}
 	}
-	items := []model.SettingItem{
-		{Key: conf.PikPakTempDir, Value: req.TempDir, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.PikPakTempDir: req.TempDir,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -223,10 +223,10 @@ func SetThunder(c *gin.Context) {
 			return
 		}
 	}
-	items := []model.SettingItem{
-		{Key: conf.ThunderTempDir, Value: req.TempDir, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.ThunderTempDir: req.TempDir,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -267,10 +267,10 @@ func SetGuangYaPan(c *gin.Context) {
 			return
 		}
 	}
-	items := []model.SettingItem{
-		{Key: conf.GuangYaPanTempDir, Value: req.TempDir, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.GuangYaPanTempDir: req.TempDir,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -311,10 +311,10 @@ func SetOpen123(c *gin.Context) {
 			return
 		}
 	}
-	items := []model.SettingItem{
-		{Key: conf.Open123TempDir, Value: req.TempDir, Type: conf.TypeString, Group: model.OFFLINE_DOWNLOAD, Flag: model.PRIVATE},
+	values := map[string]string{
+		conf.Open123TempDir: req.TempDir,
 	}
-	if err := op.SaveSettingItems(items); err != nil {
+	if err := op.SetSettingValues(values); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}

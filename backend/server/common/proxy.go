@@ -86,9 +86,9 @@ func Proxy(w http.ResponseWriter, r *http.Request, link *model.Link, file model.
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if r.URL.Query().Get("type") == "preview" {
 			if isInlineSafeContentType(w.Header().Get("Content-Type")) {
-				w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"; filename*=UTF-8''%s`, file.GetName(), url.PathEscape(file.GetName())))
+				w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"; filename*=UTF-8''%s`, utils.SanitizeForHeader(file.GetName()), url.PathEscape(file.GetName())))
 			} else {
-				w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, file.GetName(), url.PathEscape(file.GetName())))
+				w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, utils.SanitizeForHeader(file.GetName()), url.PathEscape(file.GetName())))
 			}
 		}
 		w.WriteHeader(res.StatusCode)
@@ -105,7 +105,7 @@ func Proxy(w http.ResponseWriter, r *http.Request, link *model.Link, file model.
 }
 func attachHeader(w http.ResponseWriter, file model.Obj) {
 	fileName := file.GetName()
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, fileName, url.PathEscape(fileName)))
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, utils.SanitizeForHeader(fileName), url.PathEscape(fileName)))
 	w.Header().Set("Content-Type", utils.GetMimeType(fileName))
 	w.Header().Set("Etag", GetEtag(file))
 	w.Header().Set("X-Content-Type-Options", "nosniff")

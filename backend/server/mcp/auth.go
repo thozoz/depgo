@@ -8,9 +8,11 @@ import (
 	"strings"
 
 	"github.com/alist-org/alist/v3/internal/conf"
+	"github.com/alist-org/alist/v3/internal/db"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/internal/setting"
+	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/alist-org/alist/v3/server/common"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,6 +32,10 @@ func HTTPContextFunc(ctx context.Context, r *http.Request) context.Context {
 	user, err := authenticateToken(token)
 	if err != nil {
 		log.Debugf("MCP auth failed: %v", err)
+		return ctx
+	}
+	if err := requireActiveSession(r, user); err != nil {
+		log.Debugf("MCP auth rejected: %v", err)
 		return ctx
 	}
 
@@ -86,6 +92,35 @@ func authenticateToken(token string) (*model.User, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+// requireActiveSession rejects a credential whose device session was retired.
+//
+// Each HTTP request runs middlewares.HandleSession, which notices an inactive
+// session and refuses. MCP requests skipped that path entirely, so a session that
+// an admin (or the max_devices policy) had evicted kept working over MCP: the
+// eviction was silently ineffective on that protocol.
+//
+// The check is deliberately advisory rather than authoritative: if no session row
+// exists for the credential, MCP still allows it. MCP clients are not browsers and
+// are not required to have logged in over HTTP, so demanding an existing row would
+// lock out legitimate automation. What it does catch is the case that matters -
+// a session that exists and has been explicitly deactivated.
+func requireActiveSession(r *http.Request, user *model.User) error {
+	clientID := r.Header.Get("Client-Id")
+	if clientID == "" {
+		clientID = r.URL.Query().Get("client_id")
+	}
+	deviceKey := utils.GetMD5EncodeStr(fmt.Sprintf("%d-%s", user.ID, clientID))
+
+	sess, err := db.GetSession(user.ID, deviceKey)
+	if err != nil {
+		return nil // no session row to contradict the credential
+	}
+	if sess.Status == model.SessionInactive {
+		return fmt.Errorf("session has been deactivated")
+	}
+	return nil
 }
 
 func loadRoles(user *model.User) error {

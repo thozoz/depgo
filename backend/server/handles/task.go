@@ -1,10 +1,12 @@
 package handles
 
 import (
+	"math"
+	"reflect"
+	"time"
+
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/task"
-	"math"
-	"time"
 
 	"github.com/alist-org/alist/v3/internal/fs"
 	"github.com/alist-org/alist/v3/internal/offline_download/tool"
@@ -77,6 +79,9 @@ func getUserInfo(c *gin.Context) (bool, uint, bool) {
 
 func getTargetedHandler[T task.TaskExtensionInfo](manager task.Manager[T], callback func(c *gin.Context, task T)) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !requireManager(manager, c) {
+			return
+		}
 		isAdmin, uid, ok := getUserInfo(c)
 		if !ok {
 			// if there is no bug, here is unreachable
@@ -99,6 +104,9 @@ func getTargetedHandler[T task.TaskExtensionInfo](manager task.Manager[T], callb
 
 func getBatchHandler[T task.TaskExtensionInfo](manager task.Manager[T], callback func(task T)) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if !requireManager(manager, c) {
+			return
+		}
 		isAdmin, uid, ok := getUserInfo(c)
 		if !ok {
 			common.ErrorStrResp(c, "user invalid", 401)
@@ -122,8 +130,35 @@ func getBatchHandler[T task.TaskExtensionInfo](manager task.Manager[T], callback
 	}
 }
 
+// requireManager answers 503 when the task manager for this queue was never
+// initialised.
+//
+// The check needs reflect: the managers are declared as *tache.Manager, and
+// passing a nil pointer into the task.Manager interface yields a non-nil
+// interface holding a nil pointer, so a plain `manager == nil` test passes and
+// the handler then dereferences nil. Without this guard the request is answered
+// by gin.Recovery with an opaque 500 instead of the truthful "not available".
+func requireManager[T task.TaskExtensionInfo](manager task.Manager[T], c *gin.Context) bool {
+	if manager == nil {
+		common.ErrorStrResp(c, "task manager is not available", 503)
+		return false
+	}
+	value := reflect.ValueOf(manager)
+	switch value.Kind() {
+	case reflect.Ptr, reflect.Interface, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan:
+		if value.IsNil() {
+			common.ErrorStrResp(c, "task manager is not available", 503)
+			return false
+		}
+	}
+	return true
+}
+
 func taskRoute[T task.TaskExtensionInfo](g *gin.RouterGroup, manager task.Manager[T]) {
 	g.GET("/undone", func(c *gin.Context) {
+		if !requireManager(manager, c) {
+			return
+		}
 		isAdmin, uid, ok := getUserInfo(c)
 		if !ok {
 			// if there is no bug, here is unreachable
@@ -138,6 +173,9 @@ func taskRoute[T task.TaskExtensionInfo](g *gin.RouterGroup, manager task.Manage
 		})))
 	})
 	g.GET("/done", func(c *gin.Context) {
+		if !requireManager(manager, c) {
+			return
+		}
 		isAdmin, uid, ok := getUserInfo(c)
 		if !ok {
 			// if there is no bug, here is unreachable
@@ -174,6 +212,9 @@ func taskRoute[T task.TaskExtensionInfo](g *gin.RouterGroup, manager task.Manage
 		manager.Retry(task.GetID())
 	}))
 	g.POST("/clear_done", func(c *gin.Context) {
+		if !requireManager(manager, c) {
+			return
+		}
 		isAdmin, uid, ok := getUserInfo(c)
 		if !ok {
 			// if there is no bug, here is unreachable
@@ -187,6 +228,9 @@ func taskRoute[T task.TaskExtensionInfo](g *gin.RouterGroup, manager task.Manage
 		common.SuccessResp(c)
 	})
 	g.POST("/clear_succeeded", func(c *gin.Context) {
+		if !requireManager(manager, c) {
+			return
+		}
 		isAdmin, uid, ok := getUserInfo(c)
 		if !ok {
 			// if there is no bug, here is unreachable
@@ -199,6 +243,9 @@ func taskRoute[T task.TaskExtensionInfo](g *gin.RouterGroup, manager task.Manage
 		common.SuccessResp(c)
 	})
 	g.POST("/retry_failed", func(c *gin.Context) {
+		if !requireManager(manager, c) {
+			return
+		}
 		isAdmin, uid, ok := getUserInfo(c)
 		if !ok {
 			// if there is no bug, here is unreachable

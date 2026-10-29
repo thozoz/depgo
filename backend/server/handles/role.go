@@ -36,7 +36,7 @@ func GetRole(c *gin.Context) {
 	}
 	role, err := op.GetRole(uint(id))
 	if err != nil {
-		common.ErrorResp(c, err, 500, true)
+		common.GetErrResp(c, err, true)
 		return
 	}
 	common.SuccessResp(c, role)

@@ -121,7 +121,7 @@ func GetStorage(c *gin.Context) {
 	}
 	storage, err := db.GetStorageById(uint(id))
 	if err != nil {
-		common.ErrorResp(c, err, 500, true)
+		common.GetErrResp(c, err, true)
 		return
 	}
 	common.SuccessResp(c, storage)

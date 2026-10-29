@@ -95,7 +95,7 @@ func loginLdap(c *gin.Context, req *LoginReq) {
 	if err != nil {
 		utils.Log.Errorf("Failed to auth. %v", err)
 		common.ErrorResp(c, err, 400)
-		loginCache.Set(ip, count+1)
+		recordLoginFailure(ip)
 		return
 	} else {
 		utils.Log.Infof("Auth successful username:%s", req.Username)
@@ -107,7 +107,7 @@ func loginLdap(c *gin.Context, req *LoginReq) {
 		user, err = ladpRegister(req.Username)
 		if err != nil {
 			common.ErrorResp(c, err, 400)
-			loginCache.Set(ip, count+1)
+			recordLoginFailure(ip)
 			return
 		}
 	}

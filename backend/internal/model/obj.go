@@ -243,11 +243,25 @@ func (om *ObjMerge) clickObj(obj Obj) bool {
 	return om.set.Add(obj.GetName())
 }
 
+// InitHideReg compiles the hide expressions applied to a directory listing.
+//
+// MustCompile is wrong here: the expression comes from a stored setting or meta
+// row that an operator can edit, and a single invalid line would panic every
+// listing that touches it. A pattern that cannot be compiled is kept as a
+// wildcard so the files it was meant to hide stay hidden - failing open would
+// expose exactly what the rule protects.
 func (om *ObjMerge) InitHideReg(hides string) {
 	rs := strings.Split(hides, "\n")
 	om.regs = make([]*regexp2.Regexp, 0, len(rs))
 	for _, r := range rs {
-		om.regs = append(om.regs, regexp2.MustCompile(r, regexp2.None))
+		if r == "" {
+			continue
+		}
+		compiled, err := regexp2.Compile(r, regexp2.None)
+		if err != nil {
+			compiled = regexp2.MustCompile(`.*`, regexp2.None)
+		}
+		om.regs = append(om.regs, compiled)
 	}
 }
 

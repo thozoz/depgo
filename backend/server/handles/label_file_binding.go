@@ -40,8 +40,6 @@ func GetLabelByFileName(c *gin.Context) {
 		common.ErrorResp(c, errors.New("invalid file_name"), 400)
 		return
 	}
-	fmt.Println(">>> 原始 fileName:", fileName)
-	fmt.Println(">>> 解码后 fileName:", decodedFileName)
 	userObj, ok := c.Value("user").(*model.User)
 	if !ok {
 		common.ErrorStrResp(c, "user invalid", 401)

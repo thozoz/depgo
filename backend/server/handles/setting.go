@@ -36,8 +36,7 @@ type SetTokenReq struct {
 
 func ResetToken(c *gin.Context) {
 	token := random.Token()
-	item := model.SettingItem{Key: conf.Token, Value: token, Type: conf.TypeString, Group: model.SINGLE, Flag: model.PRIVATE}
-	if err := op.SaveSettingItem(&item); err != nil {
+	if err := op.SetSettingValue(conf.Token, token); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}
@@ -51,8 +50,7 @@ func SetToken(c *gin.Context) {
 		common.ErrorResp(c, err, 400)
 		return
 	}
-	item := model.SettingItem{Key: conf.Token, Value: req.Token, Type: conf.TypeString, Group: model.SINGLE, Flag: model.PRIVATE}
-	if err := op.SaveSettingItem(&item); err != nil {
+	if err := op.SetSettingValue(conf.Token, req.Token); err != nil {
 		common.ErrorResp(c, err, 500)
 		return
 	}

@@ -3,13 +3,13 @@ package mcp
 import (
 	"context"
 	"path"
-	"strings"
 
 	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/fs"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/internal/search"
+	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/alist-org/alist/v3/server/common"
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
@@ -92,9 +92,9 @@ func handleFsList(ctx context.Context, user *model.User, req mcp.CallToolRequest
 	}
 
 	return jsonResult(map[string]interface{}{
-		"content": items,
-		"total":   total,
-		"page":    page,
+		"content":  items,
+		"total":    total,
+		"page":     page,
 		"per_page": perPage,
 	})
 }
@@ -157,7 +157,8 @@ func handleFsSearch(ctx context.Context, user *model.User, req mcp.CallToolReque
 	// Filter by permission
 	filtered := make([]model.SearchNode, 0, len(nodes))
 	for _, node := range nodes {
-		if !strings.HasPrefix(node.Parent, user.BasePath) {
+		// Contains, not prefix: "/public" must not admit "/public-secret".
+		if !utils.IsSubPath(user.BasePath, node.Parent) {
 			continue
 		}
 		meta, err := op.GetNearestMeta(node.Parent)

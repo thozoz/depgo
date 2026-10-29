@@ -2,6 +2,7 @@ package handles
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -30,6 +31,19 @@ var (
 	defaultTimes               = 5
 	invalidLoginCredentialsMsg = "username or password is incorrect"
 )
+
+// recordLoginFailure increments the failure counter for key while giving the
+// whole entry a fresh window.
+//
+// The counter used to be stored without any expiry, so failures accumulated
+// forever: four typos today plus one next week locked the caller out, even
+// though no burst ever happened. Attaching the window to each write makes the
+// limit mean "defaultTimes failures within defaultDuration", which is what the
+// message and the lockout length already imply.
+func recordLoginFailure(key string) {
+	count, _ := loginCache.Get(key)
+	loginCache.Set(key, count+1, cache.WithEx[int](defaultDuration))
+}
 
 type LoginReq struct {
 	Username string `json:"username" binding:"required"`
@@ -71,20 +85,20 @@ func loginHash(c *gin.Context, req *LoginReq) {
 	user, err := op.GetUserByName(req.Username)
 	if err != nil {
 		common.ErrorStrResp(c, invalidLoginCredentialsMsg, 400)
-		loginCache.Set(ip, count+1)
+		recordLoginFailure(ip)
 		return
 	}
 	// validate password hash
 	if err := user.ValidatePwdStaticHash(req.Password); err != nil {
 		common.ErrorStrResp(c, invalidLoginCredentialsMsg, 400)
-		loginCache.Set(ip, count+1)
+		recordLoginFailure(ip)
 		return
 	}
 	// check 2FA
 	if user.OtpSecret != "" {
 		if !totp.Validate(req.OtpCode, user.OtpSecret) {
 			common.ErrorStrResp(c, "Invalid 2FA code", 402)
-			loginCache.Set(ip, count+1)
+			recordLoginFailure(ip)
 			return
 		}
 	}
@@ -190,8 +204,33 @@ func CurrentUser(c *gin.Context) {
 	common.SuccessResp(c, userResp)
 }
 
+// UpdateCurrentReq is the self-service profile update payload.
+//
+// Every field is optional, so a client can change the password without resending
+// the username (and vice versa). Requiring username made a password-only change
+// impossible, which broke the ordinary "change my password" flow.
+//
+// CurrentPassword is required whenever Password is set (except when the caller
+// authenticated with the site admin token). Without it, anyone holding a stolen
+// session token could set a new password and lock the real owner out of their own
+// account; asking for the current password means token theft alone is not enough
+// to take ownership.
+//
+// sso_id is deliberately absent. It used to be accepted here, which meant any
+// logged-in user could write an arbitrary value into their own SsoID column.
+// SSO login resolves the account with db.GetUserBySSOID and then issues a token
+// for whatever user that returns, so a user could set their SsoID to another
+// user's identifier and, on their next SSO sign-in, receive that user's
+// session. The binding belongs to the verified SSO flow, never to a profile
+// form.
+type UpdateCurrentReq struct {
+	Username        *string `json:"username"`
+	Password        *string `json:"password"`
+	CurrentPassword *string `json:"current_password"`
+}
+
 func UpdateCurrent(c *gin.Context) {
-	var req model.User
+	var req UpdateCurrentReq
 	if err := c.ShouldBind(&req); err != nil {
 		common.ErrorResp(c, err, 400)
 		return
@@ -201,16 +240,60 @@ func UpdateCurrent(c *gin.Context) {
 		common.ErrorStrResp(c, "Guest user can not update profile", 403)
 		return
 	}
-	user.Username = req.Username
-	if req.Password != "" {
-		user.SetPassword(req.Password)
+	if req.Username == nil && req.Password == nil {
+		common.ErrorStrResp(c, "nothing to update", 400)
+		return
 	}
-	user.SsoID = req.SsoID
-	if err := op.UpdateUser(user); err != nil {
+
+	// Work on a copy: the value in the request context is the cached user and
+	// mutating it before the update succeeds would leave the cache describing
+	// state that was never persisted.
+	updated := *user
+	updated.RolesDetail = nil
+	updated.Password = ""
+	updated.SsoID = user.SsoID // not settable here; keep what is stored
+
+	if req.Username != nil {
+		name := strings.TrimSpace(*req.Username)
+		if name == "" {
+			common.ErrorStrResp(c, "username can not be empty", 400)
+			return
+		}
+		if name != user.Username {
+			if other, err := op.GetUserByName(name); err == nil && other.ID != user.ID {
+				common.ErrorStrResp(c, "username is already taken", 400)
+				return
+			}
+			updated.Username = name
+		}
+	}
+	if req.Password != nil {
+		if *req.Password == "" {
+			common.ErrorStrResp(c, "password can not be empty", 400)
+			return
+		}
+		// A stolen session token must not be enough to take ownership of the
+		// account: prove knowledge of the current password first. The site admin
+		// token is exempt because it already represents full control and has its
+		// own administrative reset path.
+		if !isSiteAdminToken(c) {
+			if req.CurrentPassword == nil || *req.CurrentPassword == "" {
+				common.ErrorStrResp(c, "current password is required to set a new one", 400)
+				return
+			}
+			if err := updated.ValidateRawPassword(*req.CurrentPassword); err != nil {
+				common.ErrorStrResp(c, "current password is incorrect", 403)
+				return
+			}
+		}
+		updated.SetPassword(*req.Password)
+	}
+
+	if err := op.UpdateUser(&updated); err != nil {
 		common.ErrorResp(c, err, 500)
-	} else {
-		common.SuccessResp(c)
+		return
 	}
+	common.SuccessResp(c)
 }
 
 func Generate2FA(c *gin.Context) {
@@ -284,4 +367,15 @@ func LogOut(c *gin.Context) {
 	} else {
 		common.SuccessResp(c)
 	}
+}
+
+// isSiteAdminToken reports whether the request authenticated with the site admin
+// token rather than a per-user session.
+func isSiteAdminToken(c *gin.Context) bool {
+	token := c.GetHeader("Authorization")
+	adminToken := setting.GetStr(conf.Token)
+	if token == "" || adminToken == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(adminToken)) == 1
 }

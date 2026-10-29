@@ -1,9 +1,11 @@
 package common
 
 import (
+	"crypto/subtle"
 	"path"
 	"strings"
 
+	"github.com/Xhofe/go-cache"
 	"github.com/dlclark/regexp2"
 
 	"github.com/alist-org/alist/v3/internal/model"
@@ -81,11 +83,8 @@ func CanAccessWithRoles(u *model.User, meta *model.Meta, reqPath, password strin
 	perm := MergeRolePermissions(u, reqPath)
 	if meta != nil && !HasPermission(perm, PermSeeHides) && meta.Hide != "" &&
 		IsApply(meta.Path, path.Dir(reqPath), meta.HSub) {
-		for _, hide := range strings.Split(meta.Hide, "\n") {
-			re := regexp2.MustCompile(hide, regexp2.None)
-			if isMatch, _ := re.MatchString(path.Base(reqPath)); isMatch {
-				return false
-			}
+		if hidePatternMatches(meta.Hide, path.Base(reqPath)) {
+			return false
 		}
 	}
 	if HasPermission(perm, PermAccessWithoutPassword) {
@@ -97,7 +96,44 @@ func CanAccessWithRoles(u *model.User, meta *model.Meta, reqPath, password strin
 	if !utils.PathEqual(meta.Path, reqPath) && !meta.PSub {
 		return true
 	}
-	return meta.Password == password
+	// Constant-time comparison: the directory password is a shared secret and a
+	// byte-at-a-time comparison leaks its prefix through response timing.
+	return subtle.ConstantTimeCompare([]byte(meta.Password), []byte(password)) == 1
+}
+
+// hideRegexCache keeps compiled hide expressions so the per-request hot path
+// does not recompile them. Meta records are few, so the unbounded map is bounded
+// in practice by the number of distinct patterns an admin has saved.
+var hideRegexCache = cache.NewMemCache[*regexp2.Regexp]()
+
+// hidePatternMatches reports whether filename matches any line of the meta hide
+// expression.
+//
+// It used to call regexp2.MustCompile, which panics on an invalid pattern: a
+// single bad line - saved by an older version or edited directly in the
+// database - turned every listing request under that meta into a recovered
+// panic. Compile failures are now treated as "matches", which denies access: a
+// hide rule that cannot be evaluated must not silently expose the files it was
+// meant to hide.
+func hidePatternMatches(hide, filename string) bool {
+	for _, pattern := range strings.Split(hide, "\n") {
+		if pattern == "" {
+			continue
+		}
+		re, ok := hideRegexCache.Get(pattern)
+		if !ok {
+			compiled, err := regexp2.Compile(pattern, regexp2.None)
+			if err != nil {
+				return true // fail closed
+			}
+			hideRegexCache.Set(pattern, compiled)
+			re = compiled
+		}
+		if matched, err := re.MatchString(filename); err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
 
 func CanReadPathByRole(u *model.User, reqPath string) bool {

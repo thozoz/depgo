@@ -281,14 +281,35 @@ func calcPagesTotal(total, perPage int) int {
 	return (total + perPage - 1) / perPage
 }
 
+// pagination slices objs according to req.
+//
+// The parameters are clamped here rather than trusted from the caller: a page of
+// zero or less produced a negative start and a slice-bounds panic, which is a
+// remote crash on any handler that reaches this function without normalising
+// first (FsArchiveList did not). Clamping also caps the returned window, so an
+// oversized per_page cannot make one response unbounded.
+//
+// A negative per_page keeps its existing meaning of "everything", matching
+// AllPerPage.
 func pagination(objs []model.Obj, req *model.PageReq) (int, []model.Obj) {
 	pageIndex, pageSize := req.Page, req.PerPage
 	total := len(objs)
-	if pageSize == AllPerPage {
+
+	if pageSize < 0 {
 		return total, objs
 	}
+	if pageSize == 0 {
+		pageSize = DefaultPerPage
+	}
+	if pageSize > MaxPerPage {
+		pageSize = MaxPerPage
+	}
+	if pageIndex < 1 {
+		pageIndex = 1
+	}
+
 	start := (pageIndex - 1) * pageSize
-	if start > total {
+	if start >= total {
 		return total, []model.Obj{}
 	}
 	end := start + pageSize

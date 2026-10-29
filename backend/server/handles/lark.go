@@ -74,7 +74,7 @@ func LarkExportDownload(c *gin.Context) {
 		filename = stdpath.Base(reqPath)
 	}
 
-	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, filename, url.PathEscape(filename)))
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, utils.SanitizeForHeader(filename), url.PathEscape(filename)))
 	c.Header("Content-Type", utils.GetMimeType(filename))
 	c.Status(http.StatusOK)
 	if _, err = io.Copy(c.Writer, reader); err != nil {

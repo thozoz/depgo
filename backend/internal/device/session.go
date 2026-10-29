@@ -39,58 +39,41 @@ func Handle(userID uint, deviceKey, ua, ip string) error {
 	}
 
 	max := setting.GetInt(conf.MaxDevices, 0)
-	if max > 0 {
-		count, err := db.CountActiveSessionsByUser(userID)
-		if err != nil {
-			return err
-		}
-		if count >= int64(max) {
-			policy := setting.GetStr(conf.DeviceEvictPolicy, "deny")
-			if policy == "evict_oldest" {
-				if oldest, err := db.GetOldestActiveSession(userID); err == nil {
-					if err := db.MarkInactive(oldest.DeviceKey); err != nil {
-						return err
-					}
-				}
-			} else {
-				return errors.WithStack(errs.TooManyDevices)
-			}
-		}
-	}
+	evictOldest := setting.GetStr(conf.DeviceEvictPolicy, "deny") == "evict_oldest"
 
 	s := &model.Session{UserID: userID, DeviceKey: deviceKey, UserAgent: ua, IP: ip, LastActive: now, Status: model.SessionActive}
-	return db.CreateSession(s)
+	// Count and insert in one transaction: checking the budget separately let
+	// concurrent logins all observe the same free slot and overshoot the limit.
+	err = db.CreateSessionWithinLimit(s, int64(max), evictOldest)
+	return err
 }
 
-// EnsureActiveOnLogin is used only in login flow:
-// - If session exists (even Inactive): reactivate and refresh fields.
-// - If not exists: apply max-devices policy, then create Active session.
+// EnsureActiveOnLogin is used only in the login flow:
+//   - If the session exists (even Inactive): reactivate it and refresh fields.
+//   - If it does not exist: apply the max-devices policy, then create an Active
+//     session.
+//
+// The budget check and the insert happen in one transaction. Doing them as two
+// statements let concurrent logins from different clients all observe the same
+// free slot, so a max_devices=2 account accumulated five active sessions.
 func EnsureActiveOnLogin(userID uint, deviceKey, ua, ip string) error {
 	ip = utils.MaskIP(ip)
 	now := time.Now().Unix()
 
+	maxDevices := int64(setting.GetInt(conf.MaxDevices, 0))
+	evictOldest := setting.GetStr(conf.DeviceEvictPolicy, "deny") == "evict_oldest"
+
 	sess, err := db.GetSession(userID, deviceKey)
 	if err == nil {
 		if sess.Status == model.SessionInactive {
-			max := setting.GetInt(conf.MaxDevices, 0)
-			if max > 0 {
-				count, err := db.CountActiveSessionsByUser(userID)
-				if err != nil {
-					return err
-				}
-				if count >= int64(max) {
-					policy := setting.GetStr(conf.DeviceEvictPolicy, "deny")
-					if policy == "evict_oldest" {
-						if oldest, gerr := db.GetOldestActiveSession(userID); gerr == nil {
-							if err := db.MarkInactive(oldest.DeviceKey); err != nil {
-								return err
-							}
-						}
-					} else {
-						return errors.WithStack(errs.TooManyDevices)
-					}
-				}
-			}
+			// Reactivating a retired session consumes a slot just like a new
+			// one, so it goes through the same guarded path.
+			reactivated := *sess
+			reactivated.Status = model.SessionActive
+			reactivated.LastActive = now
+			reactivated.UserAgent = ua
+			reactivated.IP = ip
+			return db.CreateSessionWithinLimit(&reactivated, maxDevices, evictOldest)
 		}
 		sess.Status = model.SessionActive
 		sess.LastActive = now
@@ -102,34 +85,14 @@ func EnsureActiveOnLogin(userID uint, deviceKey, ua, ip string) error {
 		return err
 	}
 
-	max := setting.GetInt(conf.MaxDevices, 0)
-	if max > 0 {
-		count, err := db.CountActiveSessionsByUser(userID)
-		if err != nil {
-			return err
-		}
-		if count >= int64(max) {
-			policy := setting.GetStr(conf.DeviceEvictPolicy, "deny")
-			if policy == "evict_oldest" {
-				if oldest, gerr := db.GetOldestActiveSession(userID); gerr == nil {
-					if err := db.MarkInactive(oldest.DeviceKey); err != nil {
-						return err
-					}
-				}
-			} else {
-				return errors.WithStack(errs.TooManyDevices)
-			}
-		}
-	}
-
-	return db.CreateSession(&model.Session{
+	return db.CreateSessionWithinLimit(&model.Session{
 		UserID:     userID,
 		DeviceKey:  deviceKey,
 		UserAgent:  ua,
 		IP:         ip,
 		LastActive: now,
 		Status:     model.SessionActive,
-	})
+	}, maxDevices, evictOldest)
 }
 
 // Refresh updates last_active for the session.

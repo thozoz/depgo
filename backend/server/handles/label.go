@@ -39,7 +39,7 @@ func GetLabel(c *gin.Context) {
 	}
 	label, err := db.GetLabelById(uint(id))
 	if err != nil {
-		common.ErrorResp(c, err, 500, true)
+		common.GetErrResp(c, err, true)
 		return
 	}
 	common.SuccessResp(c, label)

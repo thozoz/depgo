@@ -418,11 +418,13 @@ func ArchiveInternalExtract(c *gin.Context) {
 		"Cache-Control":   "max-age=0, no-cache, no-store, must-revalidate",
 	}
 	filename := stdpath.Base(innerPath)
-	headers["Content-Disposition"] = fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, filename, url.PathEscape(filename))
-	contentType := c.Request.Header.Get("Content-Type")
-	if contentType == "" {
-		contentType = utils.GetMimeType(filename)
-	}
+	headers["Content-Disposition"] = fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, utils.SanitizeForHeader(filename), url.PathEscape(filename))
+	// Derive the response content type from the file name, never from the
+	// request: letting the caller choose how the server labels the bytes it
+	// returns is a reflected-content-type foothold. The download is already
+	// attachment-dispositioned and served with nosniff, but a client still has no
+	// business setting the response's type.
+	contentType := utils.GetMimeType(filename)
 	c.DataFromReader(200, size, contentType, rc, headers)
 }
 

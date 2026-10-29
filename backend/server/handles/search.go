@@ -2,7 +2,6 @@ package handles
 
 import (
 	"path"
-	"strings"
 
 	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/model"
@@ -56,7 +55,8 @@ func Search(c *gin.Context) {
 			break
 		}
 		for _, node := range nodes {
-			if !strings.HasPrefix(node.Parent, user.BasePath) {
+			// Contains, not prefix: "/public" must not admit "/public-secret".
+			if !utils.IsSubPath(user.BasePath, node.Parent) {
 				continue
 			}
 			meta, err := op.GetNearestMeta(node.Parent)

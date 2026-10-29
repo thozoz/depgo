@@ -82,10 +82,14 @@ func JoinBasePath(basePath, reqPath string) (string, error) {
 	 * 4. /../
 	 * 5. /a/b/..
 	 */
-	if reqPath == ".." ||
-		strings.HasSuffix(reqPath, "/..") ||
-		strings.HasPrefix(reqPath, "../") ||
-		strings.Contains(reqPath, "/../") {
+	// Normalise separators first: a Windows-style "..\" would otherwise slip
+	// past the checks below and be silently collapsed by Join, quietly resolving
+	// a parent-directory request to a name inside the base instead of refusing it.
+	normalized := strings.ReplaceAll(reqPath, "\\", "/")
+	if normalized == ".." ||
+		strings.HasSuffix(normalized, "/..") ||
+		strings.HasPrefix(normalized, "../") ||
+		strings.Contains(normalized, "/../") {
 		return "", errs.RelativePath
 	}
 
@@ -114,7 +118,38 @@ func ValidateNameComponent(name string) error {
 	if strings.ContainsRune(name, 0) {
 		return errs.InvalidName
 	}
+	// Control characters are rejected outright. A newline is legal in a Linux file
+	// name, which makes it usable to forge extra lines in the access log and to
+	// break any header the name is interpolated into.
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return errs.InvalidName
+		}
+	}
 	return nil
+}
+
+// SanitizeForHeader makes value safe to interpolate into an HTTP header value.
+//
+// File names are attacker-influenced (an uploader chooses them), and a quoted
+// header parameter cannot carry a quote, a backslash or a line break without
+// changing the meaning of the header. Those characters are removed rather than
+// escaped, because the percent-encoded filename* parameter already carries the
+// exact bytes for well-behaved clients.
+func SanitizeForHeader(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+	for _, r := range value {
+		switch {
+		case r == '"' || r == '\\':
+			continue
+		case r < 0x20 || r == 0x7f:
+			continue
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // JoinUnderBase safely joins baseDir with a single name component and ensures the

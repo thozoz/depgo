@@ -11,6 +11,7 @@ import (
 	"github.com/alist-org/alist/v3/pkg/utils/random"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -210,7 +211,10 @@ func (u *User) WebAuthnCredentials() []webauthn.Credential {
 	var res []webauthn.Credential
 	err := json.Unmarshal([]byte(u.Authn), &res)
 	if err != nil {
-		fmt.Println(err)
+		// Stored credential data was corrupt. Log it rather than printing to
+		// stdout: the previous fmt.Println bypassed the configured logger and the
+		// privacy filters that go with it.
+		log.Warnf("failed to decode webauthn credentials for user %d: %v", u.ID, err)
 	}
 	return res
 }

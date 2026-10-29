@@ -102,7 +102,7 @@ func GetMeta(c *gin.Context) {
 	}
 	meta, err := op.GetMetaById(uint(id))
 	if err != nil {
-		common.ErrorResp(c, err, 500, true)
+		common.GetErrResp(c, err, true)
 		return
 	}
 	common.SuccessResp(c, meta)
