@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShareResp } from '../types';
 import { shareApi } from '../api/client';
 import { formatDate } from '../utils/format';
+import { copyText } from '../utils/clipboard';
 import {
   ShareIcon,
   CopyIcon,
@@ -46,9 +47,9 @@ export const ShareManagement: React.FC = () => {
     fetchShares(1);
   }, []);
 
-  const handleCopy = (shareId: string) => {
+  const handleCopy = async (shareId: string) => {
     const url = `${window.location.origin}/s/${shareId}`;
-    navigator.clipboard.writeText(url);
+    await copyText(url);
     setCopiedId(shareId);
     setTimeout(() => setCopiedId(null), 2000);
   };

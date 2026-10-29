@@ -3,6 +3,7 @@ import { FileItem, ShareResp } from '../types';
 import { shareApi } from '../api/client';
 import { Modal } from './Modal';
 import { ShareIcon, CopyIcon, CheckIcon } from './Icons';
+import { copyText } from '../utils/clipboard';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -109,8 +110,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     return `${window.location.origin}/s/${s.share_id}`;
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const copyToClipboard = async (text: string) => {
+    await copyText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
