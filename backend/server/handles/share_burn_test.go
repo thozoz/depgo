@@ -132,6 +132,40 @@ func TestAccessLimitIsEnforcedUnderConcurrency(t *testing.T) {
 	assert.LessOrEqual(t, after.AccessCount, int64(2), "access_count must never exceed the limit")
 }
 
+func TestShareProxyAccessLimitIsEnforcedUnderConcurrency(t *testing.T) {
+	r, _, adminToken, rootDir, _ := setupTestServer(t)
+	shareID, token := createLimitedShare(t, r, adminToken, rootDir, "proxy-limit.txt", "proxypass",
+		`{"path":"/proxy-limit.txt","name":"proxy limit","password":"proxypass","access_limit":2}`)
+
+	const concurrency = 8
+	start := make(chan struct{})
+	bodies := make([]string, concurrency)
+	var wg sync.WaitGroup
+	for i := range bodies {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest("GET", fmt.Sprintf("/sp/%s?auth=%s", shareID, token), nil))
+			bodies[i] = w.Body.String()
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+
+	served := 0
+	for _, body := range bodies {
+		if strings.Contains(body, "BURN-SECRET-CONTENT") {
+			served++
+		}
+	}
+	assert.Equal(t, 2, served)
+	after, err := db.GetShareByShareID(shareID)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), after.AccessCount)
+}
+
 // TestConsumedShareIsRefusedAfterBudgetSpent checks the plain sequential case
 // still answers 410 once the budget is gone.
 func TestConsumedShareIsRefusedAfterBudgetSpent(t *testing.T) {

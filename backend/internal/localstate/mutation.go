@@ -38,6 +38,8 @@ func (s *Service) SafePut(ctx context.Context, dstDir model.Obj, stream model.Fi
 		return err
 	}
 
+	noOverwrite := noOverwriteRequested(stream)
+
 	parentRel, err := s.DiskToRelative(dstDir.GetPath())
 	if err != nil {
 		return err
@@ -60,7 +62,7 @@ func (s *Service) SafePut(ctx context.Context, dstDir model.Obj, stream model.Fi
 	// handler performs the same check before streaming, but only as a courtesy so
 	// it can reject early; the authoritative check belongs here, next to the write,
 	// because a file created in between would otherwise be replaced.
-	if noOverwriteRequested(stream) {
+	if noOverwrite {
 		if _, statErr := s.osRoot.Stat(dstRel); statErr == nil {
 			return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
 		} else if !errorsIsNotExist(statErr) {
@@ -111,6 +113,13 @@ func (s *Service) SafePut(ctx context.Context, dstDir model.Obj, stream model.Fi
 	}
 
 	if fi, err := s.osRoot.Stat(dstRel); err == nil {
+		if noOverwrite {
+			// The destination appeared while the body was being staged. The caller
+			// forbade replacing it, so fail closed instead of snapshotting and
+			// swapping over it. The rename below repeats this check atomically.
+			_ = os.Remove(tempDiskPath)
+			return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
+		}
 		if fi.IsDir() {
 			copyErr = fmt.Errorf("cannot overwrite existing directory with file: %s", dstRel)
 			return copyErr
@@ -153,10 +162,18 @@ func (s *Service) SafePut(ctx context.Context, dstDir model.Obj, stream model.Fi
 		return fmt.Errorf("failed recording journal before swap: %w", err)
 	}
 
-	// 4. Atomic replace using cross-root rename
-	if err := s.CrossRootRenameReplace(tempDiskPath, dstDiskPath); err != nil {
+	// 4. Atomic publish via cross-root rename. A no-overwrite upload must claim the
+	// name atomically, not replace whatever raced in after the checks above.
+	publish := s.CrossRootRenameReplace
+	if noOverwrite {
+		publish = s.CrossRootRenameNoReplace
+	}
+	if err := publish(tempDiskPath, dstDiskPath); err != nil {
 		_ = os.Remove(tempDiskPath)
 		_ = s.EndOperation(ctx, op.OpID, false)
+		if noOverwrite && (errors.Is(err, os.ErrExist) || errors.Is(err, syscall.EEXIST)) {
+			return fmt.Errorf("%w: [%s]", ErrDestinationExists, dstRel)
+		}
 		return fmt.Errorf("atomic replace failed: %w", err)
 	}
 

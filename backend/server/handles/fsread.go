@@ -308,13 +308,14 @@ func pagination(objs []model.Obj, req *model.PageReq) (int, []model.Obj) {
 		pageIndex = 1
 	}
 
-	start := (pageIndex - 1) * pageSize
-	if start >= total {
+	// Check the page before multiplying so an extreme page cannot overflow.
+	if total == 0 || pageIndex-1 > (total-1)/pageSize {
 		return total, []model.Obj{}
 	}
-	end := start + pageSize
-	if end > total {
-		end = total
+	start := (pageIndex - 1) * pageSize
+	end := total
+	if pageSize < total-start {
+		end = start + pageSize
 	}
 	return total, objs[start:end]
 }

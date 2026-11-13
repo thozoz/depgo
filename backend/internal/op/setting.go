@@ -242,8 +242,9 @@ func SetSettingValue(key, value string) error {
 	if err != nil {
 		return errors.WithMessagef(err, "failed to get setting [%s]", key)
 	}
-	item.Value = value
-	return SaveSettingItem(item)
+	updated := *item
+	updated.Value = value
+	return SaveSettingItem(&updated)
 }
 
 func SaveSettingItem(item *model.SettingItem) (err error) {
@@ -269,8 +270,9 @@ func SetSettingValues(values map[string]string) error {
 		if err != nil {
 			return errors.WithMessagef(err, "failed to get setting [%s]", key)
 		}
-		item.Value = value
-		merged = append(merged, *item)
+		updated := *item
+		updated.Value = value
+		merged = append(merged, updated)
 	}
 	return SaveSettingItems(merged)
 }
