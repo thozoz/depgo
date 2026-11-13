@@ -24,6 +24,26 @@ func UpsertSession(s *model.Session) error {
 	return errors.WithStack(db.Clauses(clause.OnConflict{UpdateAll: true}).Create(s).Error)
 }
 
+// RefreshActiveSession cannot reactivate a session retired after the caller read it.
+func RefreshActiveSession(userID uint, deviceKey, ua, ip string, now int64) error {
+	result := db.Model(&model.Session{}).
+		Where("user_id = ? AND device_key = ? AND status = ?", userID, deviceKey, model.SessionActive).
+		UpdateColumns(map[string]interface{}{"last_active": now, "user_agent": ua, "ip": ip})
+	if result.Error != nil {
+		return errors.WithStack(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		session, err := GetSession(userID, deviceKey)
+		if err != nil {
+			return err
+		}
+		if session.Status != model.SessionActive {
+			return errors.WithStack(errs.SessionInactive)
+		}
+	}
+	return nil
+}
+
 func DeleteSession(userID uint, deviceKey string) error {
 	return errors.WithStack(db.Where("user_id = ? AND device_key = ?", userID, deviceKey).Delete(&model.Session{}).Error)
 }
@@ -38,13 +58,35 @@ func DeleteSession(userID uint, deviceKey string) error {
 // a max_devices=2 account accumulated five active sessions. The limit is a
 // policy control against account sharing, so it has to hold under concurrency.
 //
-// alreadyActive says whether s is already counted in the active total (i.e. it
-// exists and is currently active), in which case the budget does not change.
 // evictOldest reproduces the "evict_oldest" policy: when the budget is exhausted
 // the least recently active session is retired instead of refusing the login.
 // The returned device key names the session that was evicted, if any.
-func enrolSessionWithinLimit(s *model.Session, alreadyActive bool, maxDevices int64, evictOldest bool) (evictedDeviceKey string, err error) {
+func enrolSessionWithinLimit(s *model.Session, maxDevices int64, evictOldest bool) (evictedDeviceKey string, err error) {
 	err = db.Transaction(func(tx *gorm.DB) error {
+		// Serialise concurrent enrolments for this user.
+		//
+		// One transaction is not enough on its own: under READ COMMITTED two
+		// concurrent transactions both read the old count and both insert, so a
+		// max_devices cap was still overshootable on PostgreSQL/MySQL. Locking the
+		// parent user row makes the second transaction wait and then see the
+		// first one's commit. SQLite has no row locks, so a no-op write takes the
+		// database write lock instead; concurrent writers then fail (closed)
+		// rather than both committing past the limit.
+		if tx.Dialector.Name() == "sqlite" {
+			if err := tx.Model(&model.User{}).Where("id = ?", s.UserID).
+				UpdateColumn("id", gorm.Expr("id")).Error; err != nil {
+				return errors.WithStack(err)
+			}
+		} else if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Select("id").Where("id = ?", s.UserID).First(&model.User{}).Error; err != nil {
+			return errors.WithStack(err)
+		}
+		var current model.Session
+		lookup := tx.Where("user_id = ? AND device_key = ?", s.UserID, s.DeviceKey).Take(&current).Error
+		if lookup != nil && !errors.Is(lookup, gorm.ErrRecordNotFound) {
+			return lookup
+		}
+		alreadyActive := lookup == nil && current.Status == model.SessionActive
 		if maxDevices > 0 && !alreadyActive {
 			var count int64
 			if err := tx.Model(&model.Session{}).
@@ -82,7 +124,7 @@ func enrolSessionWithinLimit(s *model.Session, alreadyActive bool, maxDevices in
 // reactivated: either way a slot is consumed, and Save inserts or updates
 // accordingly.
 func CreateSessionWithinLimit(s *model.Session, maxDevices int64, evictOldest bool) error {
-	_, err := enrolSessionWithinLimit(s, false, maxDevices, evictOldest)
+	_, err := enrolSessionWithinLimit(s, maxDevices, evictOldest)
 	return err
 }
 

@@ -13,6 +13,23 @@ import (
 	"gorm.io/gorm"
 )
 
+// CheckActive reports whether an existing session row for deviceKey is active.
+// A missing row is not an error: callers that need strictness demand a row
+// themselves (HTTP login creates one; MCP deliberately tolerates automation).
+func CheckActive(userID uint, deviceKey string) error {
+	sess, err := db.GetSession(userID, deviceKey)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if sess.Status != model.SessionActive {
+		return errors.WithStack(errs.SessionInactive)
+	}
+	return nil
+}
+
 // Handle verifies device sessions for a user and upserts current session.
 func Handle(userID uint, deviceKey, ua, ip string) error {
 	ttl := setting.GetInt(conf.DeviceSessionTTL, 86400)
@@ -28,11 +45,8 @@ func Handle(userID uint, deviceKey, ua, ip string) error {
 		if sess.Status == model.SessionInactive {
 			return errors.WithStack(errs.SessionInactive)
 		}
-		sess.Status = model.SessionActive
-		sess.LastActive = now
-		sess.UserAgent = ua
-		sess.IP = ip
-		return db.UpsertSession(sess)
+		// Refresh metadata without rewriting status: eviction may race this request.
+		return db.RefreshActiveSession(userID, deviceKey, ua, ip, now)
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
@@ -75,11 +89,8 @@ func EnsureActiveOnLogin(userID uint, deviceKey, ua, ip string) error {
 			reactivated.IP = ip
 			return db.CreateSessionWithinLimit(&reactivated, maxDevices, evictOldest)
 		}
-		sess.Status = model.SessionActive
-		sess.LastActive = now
-		sess.UserAgent = ua
-		sess.IP = ip
-		return db.UpsertSession(sess)
+		// Refresh metadata without rewriting status: eviction may race this request.
+		return db.RefreshActiveSession(userID, deviceKey, ua, ip, now)
 	}
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err

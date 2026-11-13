@@ -63,6 +63,12 @@ func TestMaxDevicesEnforcedUnderConcurrency(t *testing.T) {
 	user.SetPassword("devrace-password")
 	require.NoError(t, db.CreateUser(user))
 
+	// Exercise concurrent database connections, not just a serialized test pool.
+	sqlDB, err := db.GetDb().DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(8)
+	defer sqlDB.SetMaxOpenConns(1)
+
 	const attempts = 12
 	var wg sync.WaitGroup
 	for i := 0; i < attempts; i++ {

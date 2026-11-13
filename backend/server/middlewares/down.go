@@ -78,8 +78,9 @@ func authorizeDownloadToken(c *gin.Context, rawPath string, meta *model.Meta) bo
 		return false
 	}
 	// Reuse the session check so an evicted or expired device session cannot
-	// keep downloading with a still-valid JWT.
-	if !HandleSession(c, user) {
+	// keep downloading with a still-valid JWT. The token's own device claim names
+	// the session; a Client-Id header cannot redirect it to a fresh one.
+	if !bindClaimDeviceKey(c, claims) || !HandleSession(c, user) {
 		return false
 	}
 	if !canReadDownloadPath(user, meta, rawPath) {

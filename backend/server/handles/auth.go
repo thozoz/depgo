@@ -119,8 +119,9 @@ func loginHash(c *gin.Context, req *LoginReq) {
 		return
 	}
 
-	// generate token
-	token, err := common.GenerateToken(user)
+	// generate token, bound to the session just created so evicting that session
+	// cannot be escaped later by changing the Client-Id header
+	token, err := common.GenerateTokenWithDeviceKey(user, key)
 	if err != nil {
 		common.ErrorResp(c, err, 400, true)
 		return
