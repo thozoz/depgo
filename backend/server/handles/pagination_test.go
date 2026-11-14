@@ -1,6 +1,7 @@
 package handles
 
 import (
+	"math"
 	"testing"
 
 	"github.com/alist-org/alist/v3/internal/model"
@@ -62,6 +63,17 @@ func TestPaginationPageBeyondEnd(t *testing.T) {
 		assert.Equal(t, 5, total)
 		assert.Empty(t, got)
 	})
+}
+
+func TestPaginationRejectsOverflowingPage(t *testing.T) {
+	objs := testObjs(10)
+	for _, page := range []int{math.MaxInt, math.MaxInt/2 + 2} {
+		assert.NotPanics(t, func() {
+			total, got := pagination(objs, &model.PageReq{Page: page, PerPage: 3})
+			assert.Equal(t, len(objs), total)
+			assert.Empty(t, got)
+		})
+	}
 }
 
 // TestPaginationNormalSlices checks the ordinary behaviour is unchanged.

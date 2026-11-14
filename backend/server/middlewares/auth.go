@@ -96,21 +96,43 @@ func Auth(c *gin.Context) {
 		}
 		user.RolesDetail = roles
 	}
-	if !HandleSession(c, user) {
+	if !bindClaimDeviceKey(c, userClaims) || !HandleSession(c, user) {
 		return
 	}
 	log.Debugf("use login token: %+v", user)
 	c.Next()
 }
 
+// bindClaimDeviceKey records the device session the token was minted for, so
+// HandleSession uses it instead of hashing a client-supplied Client-Id.
+//
+// The key must come from the signed claim: deriving it from the header let a
+// bearer of a token whose session had been evicted (or retired by max_devices)
+// send a different or absent Client-Id, get a fresh active session created, and
+// keep using a token that was supposed to be dead.
+//
+// A token without the claim predates this binding and is refused rather than
+// silently downgraded to the header-derived key. Tokens are only valid while
+// their entry is in the in-memory cache, so every one of them is reissued on
+// restart anyway.
+func bindClaimDeviceKey(c *gin.Context, claims *common.UserClaims) bool {
+	if claims.DeviceKey == "" {
+		common.ErrorStrResp(c, "token is not bound to a device session, login please", 401)
+		c.Abort()
+		return false
+	}
+	c.Set("device_key_from_claims", claims.DeviceKey)
+	return true
+}
+
 // HandleSession verifies device sessions and stores context values.
 func HandleSession(c *gin.Context, user *model.User) bool {
-	clientID := c.GetHeader("Client-Id")
-	if clientID == "" {
-		clientID = c.Query("client_id")
+	key := sessionKey(c, user)
+	handle := device.Handle
+	if c.GetString("device_key_from_claims") != "" {
+		handle = device.HandleBound
 	}
-	key := utils.GetMD5EncodeStr(fmt.Sprintf("%d-%s", user.ID, clientID))
-	if err := device.Handle(user.ID, key, c.Request.UserAgent(), c.ClientIP()); err != nil {
+	if err := handle(user.ID, key, c.Request.UserAgent(), c.ClientIP()); err != nil {
 		token := c.GetHeader("Authorization")
 		if errors.Is(err, errs.SessionInactive) {
 			_ = common.InvalidateToken(token)
@@ -189,9 +211,42 @@ func Authn(c *gin.Context) {
 		}
 		user.RolesDetail = roles
 	}
+	// Authn does not upsert sessions, but it must still refuse a token whose
+	// device session was deactivated; otherwise a route guarded by it accepts an
+	// evicted credential.
+	if !bindClaimDeviceKey(c, userClaims) {
+		return
+	}
+	if err := device.CheckActive(user.ID, userClaims.DeviceKey); err != nil {
+		_ = common.InvalidateToken(token)
+		common.ErrorResp(c, err, 401)
+		c.Abort()
+		return
+	}
+	c.Set("device_key", userClaims.DeviceKey)
 	c.Set("user", user)
 	log.Debugf("use login token: %+v", user)
 	c.Next()
+}
+
+// sessionKey returns the device session key for a request.
+//
+// A token minted by login carries the key it was bound to, and that claim wins:
+// the Client-Id header is client input, so trusting it let a token whose session
+// had been deactivated resurrect itself under a different key. Header derivation
+// remains only for credentials that have no session claim at all (the site admin
+// token and the anonymous guest).
+func sessionKey(c *gin.Context, user *model.User) string {
+	if keyVal, ok := c.Get("device_key_from_claims"); ok {
+		if key, ok := keyVal.(string); ok && key != "" {
+			return key
+		}
+	}
+	clientID := c.GetHeader("Client-Id")
+	if clientID == "" {
+		clientID = c.Query("client_id")
+	}
+	return utils.GetMD5EncodeStr(fmt.Sprintf("%d-%s", user.ID, clientID))
 }
 
 func AuthNotGuest(c *gin.Context) {

@@ -39,6 +39,20 @@ func TestPrivacyRegSnapshotIsCopied(t *testing.T) {
 	assert.NotNil(t, got[0])
 }
 
+func TestDerivedSettingsReadersCannotMutatePublishedCollections(t *testing.T) {
+	SetSlice(VideoTypes, []string{"mp4"})
+	GetSlice(VideoTypes)[0] = "changed"
+	assert.Equal(t, []string{"mp4"}, GetSlice(VideoTypes))
+
+	SetFilenameCharMap(map[string]string{"/": "|"})
+	GetFilenameCharMap()["/"] = "changed"
+	assert.Equal(t, "|", GetFilenameCharMap()["/"])
+
+	SetPrivacyReg([]*regexp.Regexp{regexp.MustCompile("secret")})
+	GetPrivacyReg()[0] = nil
+	assert.NotNil(t, GetPrivacyReg()[0])
+}
+
 // TestDerivedSettingsAreRaceFree exercises the concurrent pattern the server
 // produces: handlers read while a settings save publishes. Run with -race.
 func TestDerivedSettingsAreRaceFree(t *testing.T) {

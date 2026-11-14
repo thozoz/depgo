@@ -1,7 +1,16 @@
 package net
 
 import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/alist-org/alist/v3/internal/model"
 
 	"github.com/alist-org/alist/v3/pkg/http_range"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +27,36 @@ func buildRangeSpec(n int) string {
 		spec += "0-0"
 	}
 	return spec
+}
+
+func TestServeHTTPEnforcesRangeCountLimit(t *testing.T) {
+	content := bytes.Repeat([]byte("x"), 1024)
+	for _, count := range []int{1, maxRangesPerRequest, maxRangesPerRequest + 1, 1000} {
+		t.Run(fmt.Sprintf("ranges=%d", count), func(t *testing.T) {
+			var requested []http_range.Range
+			reader := &model.RangeReadCloser{RangeReader: func(_ context.Context, r http_range.Range) (io.ReadCloser, error) {
+				requested = append(requested, r)
+				end := int64(len(content))
+				if r.Length >= 0 {
+					end = r.Start + r.Length
+				}
+				return io.NopCloser(bytes.NewReader(content[r.Start:end])), nil
+			}}
+			req := httptest.NewRequest(http.MethodGet, "/file", nil)
+			req.Header.Set("Range", buildRangeSpec(count))
+			w := httptest.NewRecorder()
+			require.NoError(t, ServeHTTP(w, req, "file.bin", time.Time{}, int64(len(content)), reader))
+			if count > maxRangesPerRequest {
+				assert.Equal(t, http.StatusOK, w.Code)
+				assert.Equal(t, content, w.Body.Bytes())
+				require.Len(t, requested, 1)
+				assert.Equal(t, int64(-1), requested[0].Length)
+			} else {
+				assert.Equal(t, http.StatusPartialContent, w.Code)
+				assert.Len(t, requested, count)
+			}
+		})
+	}
 }
 
 // TestRangeCountAmplification documents why the cap exists: a tiny request header

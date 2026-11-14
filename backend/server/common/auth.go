@@ -1,11 +1,13 @@
 package common
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Xhofe/go-cache"
 	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/alist-org/alist/v3/internal/model"
+	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/pkg/errors"
 )
@@ -15,15 +17,34 @@ var SecretKey []byte
 type UserClaims struct {
 	Username string `json:"username"`
 	PwdTS    int64  `json:"pwd_ts"`
+	// DeviceKey is the device session this token was minted for. The middlewares
+	// used to derive the session key from the client-supplied Client-Id header,
+	// so a token for an evicted device could pick a different key by changing or
+	// omitting that header, create a fresh active session, and keep working.
+	DeviceKey string `json:"device_key"`
 	jwt.RegisteredClaims
 }
 
 var validTokenCache = cache.NewMemCache[bool]()
 
+// DefaultDeviceKey is the session key for flows that do not manage a client id
+// (MCP automation, SSO, LDAP, WebAuthn). It matches the key the middlewares
+// derive for a request without a Client-Id.
+func DefaultDeviceKey(user *model.User) string {
+	return utils.GetMD5EncodeStr(fmt.Sprintf("%d-", user.ID))
+}
+
 func GenerateToken(user *model.User) (tokenString string, err error) {
+	return GenerateTokenWithDeviceKey(user, DefaultDeviceKey(user))
+}
+
+// GenerateTokenWithDeviceKey mints a token bound to a device session, so that
+// deactivating that session cannot be escaped by changing the Client-Id header.
+func GenerateTokenWithDeviceKey(user *model.User, deviceKey string) (tokenString string, err error) {
 	claim := UserClaims{
-		Username: user.Username,
-		PwdTS:    user.PwdTS,
+		Username:  user.Username,
+		PwdTS:     user.PwdTS,
+		DeviceKey: deviceKey,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(conf.Conf.TokenExpiresIn) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

@@ -21,12 +21,15 @@ func TestProcessHeaderStripsCredentialsEvenWithEmptyIgnoreList(t *testing.T) {
 	origin.Set("X-Api-Key", "SECRET-APIKEY")
 	origin.Set("Referer", "https://internal.example/admin")
 	origin.Set("X-Share-Token", "SECRET-SHARE-TOKEN")
+	origin.Set("Proxy-Authorization", "Basic SECRET")
+	origin.Set("Cookie2", "SECRETCOOKIE")
+	origin.Set("X-Csrf-Token", "SECRET-CSRF")
 	origin.Set("Accept", "*/*")
 
 	got := ProcessHeader(origin, http.Header{})
 
 	for _, header := range []string{
-		"Authorization", "Cookie", "X-Api-Key", "Referer", "X-Share-Token",
+		"Authorization", "Cookie", "Cookie2", "Proxy-Authorization", "X-Api-Key", "Referer", "X-Share-Token", "X-Csrf-Token",
 	} {
 		assert.Emptyf(t, got.Get(header), "%s must never be forwarded upstream", header)
 	}

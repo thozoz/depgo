@@ -286,6 +286,13 @@ func ValidateNameComponent(name string) error {
 	if strings.ContainsAny(name, "/\\") || strings.Contains(name, "\x00") {
 		return fmt.Errorf("%w: path separator or NUL in component [%s]", ErrInvalidName, name)
 	}
+	// Control characters (newline, tab, DEL) let one logical name appear as
+	// several lines in listings, logs and share links; no real file needs them.
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("%w: control character in component [%q]", ErrInvalidName, name)
+		}
+	}
 	return nil
 }
 

@@ -3,16 +3,17 @@ package mcp
 import (
 	"context"
 	"crypto/subtle"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/alist-org/alist/v3/internal/conf"
-	"github.com/alist-org/alist/v3/internal/db"
+	"github.com/alist-org/alist/v3/internal/device"
+	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/internal/setting"
-	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/alist-org/alist/v3/server/common"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,12 +30,12 @@ func HTTPContextFunc(ctx context.Context, r *http.Request) context.Context {
 		token = r.URL.Query().Get("token")
 	}
 
-	user, err := authenticateToken(token)
+	user, deviceKey, err := authenticateToken(token)
 	if err != nil {
 		log.Debugf("MCP auth failed: %v", err)
 		return ctx
 	}
-	if err := requireActiveSession(r, user); err != nil {
+	if err := requireActiveSession(user, deviceKey); err != nil {
 		log.Debugf("MCP auth rejected: %v", err)
 		return ctx
 	}
@@ -42,56 +43,64 @@ func HTTPContextFunc(ctx context.Context, r *http.Request) context.Context {
 	return context.WithValue(ctx, userKey, user)
 }
 
-func authenticateToken(token string) (*model.User, error) {
+// authenticateToken resolves the credential to a user and, for a login token,
+// the device session it was minted for. Admin-token and guest credentials have
+// no session and return an empty device key.
+func authenticateToken(token string) (*model.User, string, error) {
 	// Check admin static token
 	if token != "" && subtle.ConstantTimeCompare([]byte(token), []byte(setting.GetStr(conf.Token))) == 1 {
 		admin, err := op.GetAdmin()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get admin: %w", err)
+			return nil, "", fmt.Errorf("failed to get admin: %w", err)
 		}
 		if err := loadRoles(admin); err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		return admin, nil
+		return admin, "", nil
 	}
 
 	// No token: guest
 	if token == "" {
 		guest, err := op.GetGuest()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get guest: %w", err)
+			return nil, "", fmt.Errorf("failed to get guest: %w", err)
 		}
 		if guest.Disabled {
-			return nil, fmt.Errorf("guest user is disabled")
+			return nil, "", fmt.Errorf("guest user is disabled")
 		}
 		if err := loadRoles(guest); err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		return guest, nil
+		return guest, "", nil
 	}
 
 	// JWT token
 	claims, err := common.ParseToken(token)
 	if err != nil {
-		return nil, fmt.Errorf("invalid token: %w", err)
+		return nil, "", fmt.Errorf("invalid token: %w", err)
 	}
 
 	user, err := op.GetUserByName(claims.Username)
 	if err != nil {
-		return nil, fmt.Errorf("user not found: %w", err)
+		return nil, "", fmt.Errorf("user not found: %w", err)
 	}
 
 	if claims.PwdTS != user.PwdTS {
-		return nil, fmt.Errorf("password has been changed")
+		return nil, "", fmt.Errorf("password has been changed")
 	}
 	if user.Disabled {
-		return nil, fmt.Errorf("user is disabled")
+		return nil, "", fmt.Errorf("user is disabled")
 	}
 
 	if err := loadRoles(user); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return user, nil
+	if claims.DeviceKey == "" {
+		// Tokens issued before the claim existed are refused rather than silently
+		// downgraded to a header-derived session key.
+		return nil, "", fmt.Errorf("token is not bound to a device session")
+	}
+	return user, claims.DeviceKey, nil
 }
 
 // requireActiveSession rejects a credential whose device session was retired.
@@ -101,26 +110,22 @@ func authenticateToken(token string) (*model.User, error) {
 // an admin (or the max_devices policy) had evicted kept working over MCP: the
 // eviction was silently ineffective on that protocol.
 //
-// The check is deliberately advisory rather than authoritative: if no session row
-// exists for the credential, MCP still allows it. MCP clients are not browsers and
-// are not required to have logged in over HTTP, so demanding an existing row would
-// lock out legitimate automation. What it does catch is the case that matters -
-// a session that exists and has been explicitly deactivated.
-func requireActiveSession(r *http.Request, user *model.User) error {
-	clientID := r.Header.Get("Client-Id")
-	if clientID == "" {
-		clientID = r.URL.Query().Get("client_id")
+// Bound tokens require an existing, active, unexpired row even after cleanup.
+// Automation using the site token remains sessionless.
+func requireActiveSession(user *model.User, deviceKey string) error {
+	// Only a login token names a session. The site admin token and the guest
+	// credential carry no session at all, so there is nothing to check.
+	if deviceKey == "" {
+		return nil
 	}
-	deviceKey := utils.GetMD5EncodeStr(fmt.Sprintf("%d-%s", user.ID, clientID))
-
-	sess, err := db.GetSession(user.ID, deviceKey)
-	if err != nil {
-		return nil // no session row to contradict the credential
+	err := device.CheckActive(user.ID, deviceKey)
+	if err == nil {
+		return nil
 	}
-	if sess.Status == model.SessionInactive {
+	if errors.Is(err, errs.SessionInactive) {
 		return fmt.Errorf("session has been deactivated")
 	}
-	return nil
+	return fmt.Errorf("check device session: %w", err)
 }
 
 func loadRoles(user *model.User) error {

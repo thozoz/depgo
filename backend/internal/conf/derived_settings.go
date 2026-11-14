@@ -45,12 +45,11 @@ func SetSlice(key string, values []string) {
 	derivedSettings.slices[key] = copied
 }
 
-// GetSlice returns the snapshot for a comma-separated setting. The returned
-// slice must not be modified; it is shared with other readers.
+// GetSlice returns a copy of the snapshot for a comma-separated setting.
 func GetSlice(key string) []string {
 	derivedSettings.mu.RLock()
 	defer derivedSettings.mu.RUnlock()
-	return derivedSettings.slices[key]
+	return append([]string(nil), derivedSettings.slices[key]...)
 }
 
 // SetFilenameCharMap publishes a snapshot of the filename character mapping.
@@ -65,12 +64,15 @@ func SetFilenameCharMap(m map[string]string) {
 	derivedSettings.filenameCharMap = copied
 }
 
-// GetFilenameCharMap returns the current filename character mapping. The
-// returned map must not be modified.
+// GetFilenameCharMap returns a copy of the current filename character mapping.
 func GetFilenameCharMap() map[string]string {
 	derivedSettings.mu.RLock()
 	defer derivedSettings.mu.RUnlock()
-	return derivedSettings.filenameCharMap
+	copied := make(map[string]string, len(derivedSettings.filenameCharMap))
+	for k, v := range derivedSettings.filenameCharMap {
+		copied[k] = v
+	}
+	return copied
 }
 
 // SetPrivacyReg publishes a snapshot of the compiled privacy expressions.
@@ -83,12 +85,11 @@ func SetPrivacyReg(regs []*regexp.Regexp) {
 	derivedSettings.privacyReg = copied
 }
 
-// GetPrivacyReg returns the current compiled privacy expressions. The returned
-// slice must not be modified.
+// GetPrivacyReg returns a copy of the current compiled privacy expression list.
 func GetPrivacyReg() []*regexp.Regexp {
 	derivedSettings.mu.RLock()
 	defer derivedSettings.mu.RUnlock()
-	return derivedSettings.privacyReg
+	return append([]*regexp.Regexp(nil), derivedSettings.privacyReg...)
 }
 
 // ResetDerivedSettings clears every snapshot. It exists for tests that need a

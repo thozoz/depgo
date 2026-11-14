@@ -3,6 +3,7 @@
 package localstate
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 )
@@ -17,11 +18,8 @@ func renameBetweenDirs(src, dst ownedDir, srcName, dstName string, noReplace boo
 	dstPath := filepath.Join(dst.path, dstName)
 
 	if noReplace {
-		if _, err := os.Lstat(dstPath); err == nil {
-			return os.ErrExist
-		} else if !os.IsNotExist(err) {
-			return err
-		}
+		// A check followed by Rename cannot guarantee no replacement.
+		return &os.LinkError{Op: "rename-noreplace", Old: srcPath, New: dstPath, Err: errors.ErrUnsupported}
 	}
 	return os.Rename(srcPath, dstPath)
 }
