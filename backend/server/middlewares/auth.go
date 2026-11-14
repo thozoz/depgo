@@ -128,7 +128,11 @@ func bindClaimDeviceKey(c *gin.Context, claims *common.UserClaims) bool {
 // HandleSession verifies device sessions and stores context values.
 func HandleSession(c *gin.Context, user *model.User) bool {
 	key := sessionKey(c, user)
-	if err := device.Handle(user.ID, key, c.Request.UserAgent(), c.ClientIP()); err != nil {
+	handle := device.Handle
+	if c.GetString("device_key_from_claims") != "" {
+		handle = device.HandleBound
+	}
+	if err := handle(user.ID, key, c.Request.UserAgent(), c.ClientIP()); err != nil {
 		token := c.GetHeader("Authorization")
 		if errors.Is(err, errs.SessionInactive) {
 			_ = common.InvalidateToken(token)

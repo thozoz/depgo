@@ -13,21 +13,28 @@ import (
 	"gorm.io/gorm"
 )
 
-// CheckActive reports whether an existing session row for deviceKey is active.
-// A missing row is not an error: callers that need strictness demand a row
-// themselves (HTTP login creates one; MCP deliberately tolerates automation).
+// CheckActive requires a live session; a deleted row cannot resurrect a bound token.
 func CheckActive(userID uint, deviceKey string) error {
 	sess, err := db.GetSession(userID, deviceKey)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil
+		return errors.WithStack(errs.SessionInactive)
 	}
 	if err != nil {
 		return err
 	}
-	if sess.Status != model.SessionActive {
+	ttl := setting.GetInt(conf.DeviceSessionTTL, 86400)
+	if sess.Status != model.SessionActive || (ttl > 0 && sess.LastActive < time.Now().Unix()-int64(ttl)) {
 		return errors.WithStack(errs.SessionInactive)
 	}
 	return nil
+}
+
+// HandleBound refreshes an issued session without enrolling a missing one.
+func HandleBound(userID uint, deviceKey, ua, ip string) error {
+	if err := CheckActive(userID, deviceKey); err != nil {
+		return err
+	}
+	return db.RefreshActiveSession(userID, deviceKey, ua, utils.MaskIP(ip), time.Now().Unix())
 }
 
 // Handle verifies device sessions for a user and upserts current session.

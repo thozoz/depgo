@@ -37,6 +37,41 @@ func loginWithClient(t *testing.T, handler http.Handler, username, password, cli
 	return resp.Data.Token
 }
 
+func TestBoundSessionCannotBeRecreatedAfterExpiryOrCleanup(t *testing.T) {
+	for _, state := range []string{"expired", "evicted-and-cleaned", "missing"} {
+		for _, route := range []string{"/api/me", "/d/private.txt", "/p/private.txt"} {
+			t.Run(state+route, func(t *testing.T) {
+				r, _, _, _, _ := setupTestServer(t)
+				seedTestRole(t)
+				user := &model.User{ID: 710, Username: "expiry-user", Role: model.Roles{testRoleID}, BasePath: "/", Authn: "[]"}
+				user.SetPassword("expiry-password")
+				require.NoError(t, db.CreateUser(user))
+				token := loginWithClient(t, r, user.Username, "expiry-password", "expiry-device")
+				key := utils.GetMD5EncodeStr(fmt.Sprintf("%d-expiry-device", user.ID))
+				require.NoError(t, db.UpdateSessionLastActive(user.ID, key, 1))
+				if state == "evicted-and-cleaned" {
+					require.NoError(t, db.MarkInactive(key))
+					require.NoError(t, db.DeleteSessionsBefore(time.Now().Unix()))
+				} else if state == "missing" {
+					require.NoError(t, db.DeleteSession(user.ID, key))
+				}
+				req := httptest.NewRequest("GET", route, nil)
+				req.Header.Set("Authorization", token)
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, req)
+				assert.Equal(t, 401, parseRespCode(t, w), w.Body.String())
+				sess, err := db.GetSession(user.ID, key)
+				if state == "expired" {
+					require.NoError(t, err)
+					assert.Equal(t, int64(1), sess.LastActive)
+				} else {
+					assert.Error(t, err, "a bearer request must not enroll a missing session")
+				}
+			})
+		}
+	}
+}
+
 func TestSessionMetadataRefreshCannotUndoEviction(t *testing.T) {
 	setupTestServer(t)
 	key := "refresh-evicted"

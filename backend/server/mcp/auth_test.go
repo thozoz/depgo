@@ -76,13 +76,16 @@ func TestRequireActiveSessionRejectsDeactivated(t *testing.T) {
 	assert.Contains(t, err.Error(), "deactivated")
 }
 
-// TestRequireActiveSessionAllowsUnknownSession documents the deliberate leniency:
-// an MCP client that never logged in over HTTP has no session row, and demanding
-// one would lock out legitimate automation.
-func TestRequireActiveSessionAllowsUnknownSession(t *testing.T) {
+func TestRequireActiveSessionRejectsMissingAndExpiredSession(t *testing.T) {
 	setupSessionDB(t)
-
-	assert.NoError(t, requireActiveSession(&model.User{ID: 402}, deviceKeyFor(402, "never-logged-in")))
+	user := &model.User{ID: 402}
+	key := deviceKeyFor(user.ID, "expired")
+	assert.Error(t, requireActiveSession(user, key))
+	require.NoError(t, db.CreateSession(&model.Session{UserID: user.ID, DeviceKey: key, Status: model.SessionActive, LastActive: 1}))
+	assert.Error(t, requireActiveSession(user, key))
+	require.NoError(t, db.MarkInactive(key))
+	require.NoError(t, db.DeleteSessionsBefore(time.Now().Unix()))
+	assert.Error(t, requireActiveSession(user, key), "cleanup must not undo eviction")
 }
 
 // TestRequireActiveSessionIgnoresClientIDHeader is the regression test for

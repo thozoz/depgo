@@ -110,11 +110,8 @@ func authenticateToken(token string) (*model.User, string, error) {
 // an admin (or the max_devices policy) had evicted kept working over MCP: the
 // eviction was silently ineffective on that protocol.
 //
-// The check is deliberately advisory rather than authoritative: if no session row
-// exists for the credential, MCP still allows it. MCP clients are not browsers and
-// are not required to have logged in over HTTP, so demanding an existing row would
-// lock out legitimate automation. What it does catch is the case that matters -
-// a session that exists and has been explicitly deactivated.
+// Bound tokens require an existing, active, unexpired row even after cleanup.
+// Automation using the site token remains sessionless.
 func requireActiveSession(user *model.User, deviceKey string) error {
 	// Only a login token names a session. The site admin token and the guest
 	// credential carry no session at all, so there is nothing to check.
